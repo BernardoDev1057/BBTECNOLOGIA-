@@ -1,30 +1,46 @@
 import { auth } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-// Função que renderiza o menu dentro de qualquer página
 export function renderizarMenuGlobal(paginaAtiva) {
     const localMenu = document.getElementById('menu-global-container');
     if (!localMenu) return;
 
-    // Estrutura HTML do menu único
     localMenu.innerHTML = `
-        <nav style="background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <a href="dashboard.html" class="${paginaAtiva === 'dashboard' ? 'menu-ativo' : ''}">Dashboard</a>
-                <a href="clientes.html" class="${paginaAtiva === 'clientes' ? 'menu-ativo' : ''}">Clientes</a>
-                <a href="produtos.html" class="${paginaAtiva === 'produtos' ? 'menu-ativo' : ''}">Produtos</a>
-                <a href="caixa.html" class="${paginaAtiva === 'caixa' ? 'menu-ativo' : ''}">Operação de Caixa/PDV</a>
-                <a href="contas.html" class="${paginaAtiva === 'contas' ? 'menu-ativo' : ''}">Contas a Receber</a>
-                <a href="relatorios.html" class="${paginaAtiva === 'relatorios' ? 'menu-ativo' : ''}">Relatórios</a>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 rounded shadow-sm">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-bold" href="dashboard.html">🚀 ERP Control</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'dashboard' ? 'active fw-bold text-primary' : ''}" href="dashboard.html">Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'clientes' ? 'active fw-bold text-primary' : ''}" href="clientes.html">Clientes</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'produtos' ? 'active fw-bold text-primary' : ''}" href="produtos.html">Produtos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'caixa' ? 'active fw-bold text-primary' : ''}" href="caixa.html">Frente de Caixa (PDV)</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'contas' ? 'active fw-bold text-primary' : ''}" href="contas.html">Contas a Receber</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'relatorios' ? 'active fw-bold text-primary' : ''}" href="relatorios.html">Relatórios</a>
+                        </li>
+                    </ul>
+                    <button id="btn-logout-global" class="btn btn-danger btn-sm fw-bold w-sm-100 mt-2 mt-lg-0">Sair (Logout)</button>
+                </div>
             </div>
-            <button id="btn-logout-global" style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">Sair (Logout)</button>
         </nav>
     `;
 
-    // Atribui o evento de logout automaticamente em todas as páginas
     document.getElementById('btn-logout-global').addEventListener('click', () => {
-        const conf = confirm("Deseja realmente sair do sistema?");
-        if (conf) {
+        if (confirm("Deseja realmente sair do sistema?")) {
             signOut(auth).then(() => {
                 window.location.href = 'index.html';
             });

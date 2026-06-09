@@ -4,131 +4,128 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP - Dashboard Gerencial</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e9ecef; }
-        nav { background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        nav a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; }
-        .btn-sair { background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
-
-        /* Grid de Cards */
-        .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 25px; }
-        .dash-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #007bff; }
-        .dash-card h4 { margin: 0 0 10px 0; color: #666; font-size: 14px; text-transform: uppercase; }
-        .dash-card .valor { font-size: 24px; font-weight: bold; color: #212529; }
-
-        /* Variações de Cores dos Cards */
-        .card-verde { border-left-color: #28a745; }
-        .card-laranja { border-left-color: #fd7e14; }
-        .card-vermelho { border-left-color: #dc3545; }
-        .card-grafite { border-left-color: #343a40; }
-
-        /* Seção Inferior */
-        .dash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .dash-box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: #f8f9fa; }
-
-        /* Estilização para a Área de Atalhos Dinâmicos */
-        .box-atalhos { display: flex; flex-direction: column; gap: 15px; }
-        .card-link { display: block; text-decoration: none; color: #212529; background: #f8f9fa; padding: 15px; border-radius: 6px; border-left: 4px solid #007bff; font-weight: bold; transition: background 0.2s; }
-        .card-link:hover { background: #e2e6ea; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-   <div id="menu-global-container"></div>
+<body class="bg-light">
 
-    <h2>Painel de Indicadores Gerenciais</h2>
-    <p>Dados consolidados em tempo real com base nas movimentações do sistema.</p>
+    <div class="container py-3">
+        <div id="menu-global-container"></div>
 
-    <div class="dash-grid">
-        <div class="dash-card card-verde">
-            <h4>Vendas Hoje</h4>
-            <div class="valor" id="db-vendas-hoje">R$ 0.00</div>
-        </div>
-        <div class="dash-card">
-            <h4>Vendas do Mês</h4>
-            <div class="valor" id="db-vendas-mes">R$ 0.00</div>
-        </div>
-        <div class="dash-card card-verde">
-            <h4>Lucro Estimado</h4>
-            <div class="valor" id="db-lucro">R$ 0.00</div>
-        </div>
-        <div class="dash-card card-grafite">
-            <h4>Ticket Médio</h4>
-            <div class="valor" id="db-ticket">R$ 0.00</div>
-        </div>
-    </div>
-
-    <div class="dash-grid">
-        <div class="dash-card card-laranja">
-            <h4>Caixa Atual (Dinheiro)</h4>
-            <div class="valor" id="db-caixa-atual">R$ 0.00</div>
-        </div>
-        <div class="dash-card card-laranja">
-            <h4>Contas a Receber</h4>
-            <div class="valor" id="db-contas-receber">R$ 0.00</div>
-        </div>
-        <div class="dash-card card-vermelho">
-            <h4>Produtos Alerta Estoque</h4>
-            <div class="valor" id="db-estoque-baixo">0</div>
-        </div>
-    </div>
-
-    <div class="dash-row">
-        <div class="dash-box">
-            <div>
-                <h3>🔥 Ranking de Produtos Mais Vendidos</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Posição</th>
-                            <th>Produto</th>
-                            <th>Quantidade Vendida</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-mais-vendidos">
-                        <tr><td colspan="3" style="text-align: center; color: #999;">Processando métricas...</td></tr>
-                    </tbody>
-                </table>
+        <div class="row mb-3">
+            <div class="col">
+                <h2 class="fw-bold">Painel de Indicadores Gerenciais</h2>
+                <p class="text-muted">Dados consolidados em tempo real com base nas movimentações do sistema.</p>
             </div>
         </div>
 
-        <div class="dash-box" style="background: #343a40; color: white;">
-            <h3 style="margin-top: 0;">Atalhos de Gestão</h3>
-            
-            <div class="box-atalhos">
-                <a href="contas.html" class="card-link" style="border-left-color: #007bff;">
-                    💳 Contas a Receber (Quitar Dívidas de Fiado)
-                </a>
-                
-                <a href="relatorios.html" class="card-link" style="border-left-color: #fd7e14;">
-                    📊 Painel de Relatórios e Auditorias
-                </a>
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card h-100 border-start border-success border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Vendas Hoje</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-vendas-hoje">R$ 0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card h-100 border-start border-primary border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Vendas do Mês</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-vendas-mes">R$ 0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card h-100 border-start border-success border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Lucro Estimado</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-lucro">R$ 0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <div class="card h-100 border-start border-dark border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Ticket Médio</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-ticket">R$ 0.00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-4">
+                <div class="card h-100 border-start border-warning border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Caixa Atual (Dinheiro)</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-caixa-atual">R$ 0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="card h-100 border-start border-warning border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Contas a Receber</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-contas-receber">R$ 0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="card h-100 border-start border-danger border-4 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-1 text-muted text-uppercase small fw-bold">Produtos Alerta Estoque</h6>
+                        <div class="fs-3 fw-bold text-dark" id="db-estoque-baixo">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-12 col-lg-7">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold">🔥 Ranking de Produtos Mais Vendidos</div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr><th>Posição</th><th>Produto</th><th>Quantidade</th></tr>
+                                </thead>
+                                <tbody id="tabela-mais-vendidos">
+                                    <tr><td colspan="3" class="text-center text-muted py-4">Processando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <hr style="width: 100%; border: 0; border-top: 1px solid #495057; margin: 20px 0;">
-
-            <div style="text-align: center;">
-                <p style="margin-bottom: 15px;">Precisa realizar uma venda rápida ou gerenciar o caixa de turno?</p>
-                <a href="caixa.html" style="display: inline-block; background: #28a745; color: white; padding: 12px 25px; text-decoration: none; font-weight: bold; border-radius: 5px; font-size: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">IR PARA O PDV / CAIXA</a>
+            <div class="col-12 col-lg-5">
+                <div class="card bg-dark text-white shadow-sm h-100">
+                    <div class="card-body d-flex flex-column justify-content-between p-4">
+                        <div>
+                            <h4 class="fw-bold mb-3">Atalhos de Gestão</h4>
+                            <div class="d-grid gap-2">
+                                <a href="contas.html" class="btn btn-outline-light text-start p-3 border-start border-primary border-4 fw-bold">💳 Contas a Receber (Fiados)</a>
+                                <a href="relatorios.html" class="btn btn-outline-light text-start p-3 border-start border-warning border-4 fw-bold">📊 Relatórios e Auditorias</a>
+                            </div>
+                        </div>
+                        <div class="text-center mt-4 pt-4 border-top border-secondary">
+                            <p class="small text-secondary">Precisa realizar uma venda rápida ou gerenciar o turno de caixa?</p>
+                            <a href="caixa.html" class="btn btn-success btn-lg w-100 fw-bold shadow">IR PARA O PDV / CAIXA</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="./js/auth-guard.js"></script>
-    <script type="module" src="./js/dashboard.js"></script>
     <script type="module">
-        import { auth } from './js/firebase-config.js';
-        import { signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-        document.getElementById('btn-logout').addEventListener('click', () => {
-            signOut(auth).then(() => window.location.href = 'index.html');
-        });
-    </script>
-<script type="module">
         import { renderizarMenuGlobal } from './js/menu.js';
         renderizarMenuGlobal('dashboard');
     </script>
+    <script type="module" src="./js/dashboard.js"></script>
 </body>
 </html>
 

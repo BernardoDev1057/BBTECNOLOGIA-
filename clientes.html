@@ -4,68 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP - Cadastro de Clientes</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f6f9; }
-        nav { background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        nav a { color: white; text-decoration: none; margin-right: 15px; }
-        .container { display: flex; gap: 20px; flex-wrap: wrap; }
-        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex: 1; min-width: 300px; }
-        input, select { width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 15px; }
-        button.btn-edit { background: #ffc107; color: black; padding: 5px 10px; width: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #f2f2f2; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-light">
 
-    <nav>
-        <a href="dashboard.html">Dashboard</a>
-        <a href="clientes.html" style="color: #007bff;"><b>Clientes</b></a>
-        <a href="produtos.html">Produtos & Estoque</a>
-        <a href="caixa.html">Operação de Caixa/PDV</a>
-    </nav>
+    <div class="container py-3">
+        <div id="menu-global-container"></div>
 
-    <div class="container">
-        <div class="box">
-            <h3>Cadastro / Edição de Cliente</h3>
-            <form id="form-cliente">
-                <input type="hidden" id="cliente-id">
-                <input type="text" id="nome" placeholder="Nome Completo" required>
-                <input type="text" id="telefone" placeholder="Telefone" required>
-                <input type="text" id="documento" placeholder="CPF ou CNPJ (Opcional)">
-                <input type="text" id="endereco" placeholder="Endereço">
-                <select id="tipo">
-                    <option value="Cliente">Cliente</option>
-                    <option value="Funcionário">Funcionário</option>
-                    <option value="Fornecedor">Fornecedor</option>
-                </select>
-                <input type="number" id="limiteCredito" placeholder="Limite de Crédito (R$)" step="0.01" value="0">
-                <button type="submit">Salvar Cliente</button>
-            </form>
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white"><h5 class="card-title mb-0 fw-bold" id="form-titulo">Cadastrar Novo Cliente</h5></div>
+            <div class="card-body">
+                <form id="form-cliente">
+                    <input type="hidden" id="cliente-id">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Nome Completo</label>
+                            <input type="text" id="cliente-nome" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Telefone (WhatsApp)</label>
+                            <input type="text" id="cliente-telefone" class="form-control" placeholder="Ex: 84999991111" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Tipo de Relação</label>
+                            <select id="cliente-tipo" class="form-select">
+                                <option value="Cliente">Cliente</option>
+                                <option value="Funcionario">Funcionário</option>
+                                <option value="Fornecedor">Fornecedor</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-semibold">Limite de Crédito (R$)</label>
+                            <input type="number" id="cliente-limite" class="form-control" step="0.01" value="0.00">
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" id="btn-salvar" class="btn btn-primary fw-bold px-4">Salvar Ficha Cadastral</button>
+                            <button type="button" id="btn-cancelar" class="btn btn-secondary fw-bold ms-2" style="display:none;">Cancelar Edição</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <div class="box" style="flex: 2;">
-            <h3>Clientes Cadastrados</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Telefone</th>
-                        <th>Tipo</th>
-                        <th>Limite</th>
-                        <th>Saldo Devedor</th>
-                        <th>Ações</th>
-                        <th>Cobrancas</th>
-                    </tr>
-                </thead>
-                <tbody id="tabela-clientes-body"></tbody>
-            </table>
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold py-3">👥 Base de Clientes Cadastrados</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped align-middle mb-0">
+                        <thead class="table-light">
+                            <tr><th>Nome</th><th>Telefone</th><th>Tipo</th><th>Limite</th><th>Saldo Devedor</th><th>Ações</th><th>Cobrança</th></tr>
+                        </thead>
+                        <tbody id="tabela-clientes"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="./js/auth-guard.js"></script>
+    <script type="module">
+        import { renderizarMenuGlobal } from './js/menu.js';
+        renderizarMenuGlobal('clientes');
+    </script>
     <script type="module" src="./js/clientes.js"></script>
 </body>
 </html>
