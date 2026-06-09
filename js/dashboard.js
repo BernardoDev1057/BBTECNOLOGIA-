@@ -1,4 +1,7 @@
 import { db, auth, ref, get } from './firebase-config.js';
+//import { executarCargaTeste } from './carga-inicial.js';
+// Descomente a linha abaixo, salve o arquivo, abra o sistema no navegador uma vez e depois comente-a de novo!
+//executarCargaTeste();
 
 async function processarMétricasDashboard() {
     if (!auth.currentUser) return;
