@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP - Contas a Receber & Histórico</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e9ecef; }
+        nav { background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        nav a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; }
+        
+        .container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .busca-bloco { background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; position: relative; }
+        
+        input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        th { background-color: #f2f2f2; }
+        
+        .btn-pagar { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .status-pago { color: #28a745; font-weight: bold; }
+        .status-aberto { color: #dc3545; font-weight: bold; }
+        
+        /* Auto-complete */
+        .busca-resultado { border: 1px solid #ccc; background: white; max-height: 150px; overflow-y: auto; position: absolute; width: calc(100% - 30px); z-index: 10; display: none; }
+        .busca-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .busca-item:hover { background: #f1f1f1; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="clientes.html">Clientes</a>
+        <a href="produtos.html">Produtos</a>
+        <a href="caixa.html">Operação de Caixa/PDV</a>
+        <a href="contas.html" style="color: #007bff;"><b>Contas a Receber (Fiados)</b></a>
+        <a href="relatorios.html">Relatórios</a>
+    </nav>
+
+    <div class="container">
+        <h2>Contas a Receber e Quitação de Débitos</h2>
+        <p>Busque um cliente para visualizar o histórico de compras no Crédito Loja e receber pagamentos.</p>
+
+        <div class="busca-bloco">
+            <label><b>Filtrar Histórico por Cliente:</b></label>
+            <input type="text" id="contas-busca-cliente" placeholder="Digite o nome do cliente para abrir a ficha financeira...">
+            <input type="hidden" id="contas-cliente-id">
+            <div id="lista-busca-cliente" class="busca-resultado"></div>
+        </div>
+
+        <h3>📋 Extrato de Títulos do Cliente</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data de Lançamento</th>
+                    <th>Valor do Título</th>
+                    <th>Status Atual</th>
+                    <th>Data do Pagamento</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-historico-contas">
+                <tr><td colspan="5" style="text-align: center; color: #999;">Digite e selecione um cliente acima para carregar o histórico.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script type="module" src="./js/auth-guard.js"></script>
+    <script type="module" src="./js/contas.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP - Relatórios Gerenciais</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e9ecef; }
+        nav { background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        nav a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; }
+        
+        .container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .filtro-bar { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 25px; background: #f8f9fa; padding: 15px; border-radius: 6px; flex-wrap: wrap; }
+        .filtro-group { display: flex; flex-direction: column; }
+        
+        input, select { padding: 8px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; min-width: 180px; }
+        button { background: #0056b3; color: white; padding: 9px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button.btn-print { background: #28a745; margin-left: auto; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+        th { background-color: #f2f2f2; }
+        .total-row { font-weight: bold; background: #e9ecef; }
+
+        @media print {
+            nav, .filtro-bar, button { display: none !important; }
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="clientes.html">Clientes</a>
+        <a href="produtos.html">Produtos</a>
+        <a href="caixa.html">Operação de Caixa/PDV</a>
+        <a href="relatorios.html" style="color: #007bff;"><b>Relatórios</b></a>
+    </nav>
+
+    <div class="container">
+        <h2>Painel de Relatórios e Auditoria</h2>
+        <p>Selecione o tipo de relatório e o período desejado para extração dos dados.</p>
+
+        <!-- Barra de Filtros Operacionais -->
+        <div class="filtro-bar">
+            <div class="filtro-group">
+                <label>Tipo de Relatório</label>
+                <select id="rep-tipo">
+                    <optgroup label="Vendas e Produtos">
+                        <option value="vendas_periodo">Vendas por Período (Dia/Mês)</option>
+                        <option value="vendas_hora">Vendas por Hora (Fluxo)</option>
+                        <option value="giro_estoque">Giro de Estoque Atual</option>
+                    </optgroup>
+                    <optgroup label="Financeiro e Caixa">
+                        <option value="fechamentos">Fechamentos de Caixa (Turnos)</option>
+                        <option value="sangrias_suprimentos">Movimentações (Sangrias/Suprimentos)</option>
+                        <option value="contas_receber">Contas a Receber (Crédito Loja)</option>
+                    </optgroup>
+                    <optgroup label="Operacional">
+                        <option value="auditoria_estoque">Auditoria de Estoque (Histórico Manual)</option>
+                    </optgroup>
+                </select>
+            </div>
+            
+            <div class="filtro-group">
+                <label>Data Inicial</label>
+                <input type="date" id="rep-data-inicio">
+            </div>
+
+            <div class="filtro-group">
+                <label>Data Final</label>
+                <input type="date" id="rep-data-fim">
+            </div>
+
+            <button id="btn-gerar-relatorio">Gerar Relatório</button>
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+        </div>
+
+        <!-- Área de Renderização de Resultados Dinâmicos -->
+        <h3 id="titulo-relatorio">Selecione os filtros acima</h3>
+        <div id="area-tabela-relatorio">
+            <table id="tabela-dados-relatorio">
+                <thead><tr id="colunas-relatorio"><th>Selecione um relatório...</th></tr></thead>
+                <tbody id="corpo-relatorio"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module" src="./js/auth-guard.js"></script>
+    <script type="module" src="./js/relatorios.js"></script>
+</body>
+</html>
+

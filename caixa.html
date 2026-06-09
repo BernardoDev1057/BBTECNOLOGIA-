@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP - Operação de Caixa e PDV</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #e9ecef; }
+        nav { background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;}
+        nav a { color: white; text-decoration: none; margin-right: 15px; font-weight: bold; }
+        
+        /* Centralizador da Abertura */
+        .box-abertura { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: 100px auto text-align: center; }
+        
+        /* Layout do PDV Ativo */
+        .pdv-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .painel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        
+        input, select { width: 100%; padding: 10px; margin: 6px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        
+        .total-box { background: #212529; color: #fff; padding: 15px; border-radius: 6px; text-align: right; font-size: 28px; font-weight: bold; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        
+        /* Modal do Caixa (Sangria / Fechamento) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 100%; max-width: 400px; }
+        
+        /* Auto-complete das buscas */
+        .busca-resultado { border: 1px solid #ccc; background: white; max-height: 150px; overflow-y: auto; position: absolute; width: calc(100% - 40px); z-index: 10; display: none; }
+        .busca-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .busca-item:hover { background: #f1f1f1; }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div>
+            <a href="dashboard.html">Dashboard</a>
+            <a href="clientes.html">Clientes</a>
+            <a href="produtos.html">Produtos</a>
+            <a href="caixa.html" style="color: #007bff;"><b>Operação de Caixa/PDV</b></a>
+        </div>
+        <div>
+            <!-- Botões de controle de fluxo de caixa (Só aparecem se aberto) -->
+            <button class="btn-secondary" id="nav-btn-sangria" style="display:none; margin-right: 5px;">💸 Sangria / Suprimento</button>
+            <button class="btn-danger" id="nav-btn-fechar" style="display:none;">🔒 Fechar Caixa</button>
+        </div>
+    </nav>
+
+    <!-- TELA 1: BLOQUEIO / FORMULÁRIO DE ABERTURA -->
+    <div id="tela-abertura" class="box-abertura" style="display: none;">
+        <h2>Abertura de Caixa</h2>
+        <p>Informe o saldo inicial de troco para liberar as vendas.</p>
+        <input type="number" id="caixa-troco-inicial" placeholder="Valor Inicial (R$)" step="0.01" value="0.00">
+        <button id="btn-confirmar-abertura" class="btn-success" style="width:100%; margin-top:10px;">Confirmar e Abrir PDV</button>
+    </div>
+
+    <!-- TELA 2: FRENTE DE CAIXA (PDV OPERACIONAL) -->
+    <div id="tela-pdv" class="pdv-container" style="display: none;">
+        
+        <!-- Esquerda: Entradas e Itens do Carrinho -->
+        <div class="painel" style="position: relative;">
+            <h3>Lançamento de Itens</h3>
+            
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                <div>
+                    <label>Buscar Produto (Nome ou Código de Barras)</label>
+                    <input type="text" id="pdv-busca-produto" placeholder="Digite para buscar ou bipe o código...">
+                    <div id="lista-busca-produto" class="busca-resultado"></div>
+                </div>
+                <div>
+                    <label>Quantidade</label>
+                    <input type="number" id="pdv-qtd" value="1" min="1" style="text-align: center;">
+                </div>
+            </div>
+            
+            <button id="btn-adicionar-item" class="btn-success" style="margin-top: 10px; width: 100%;">⚡ Adicionar Item ao Carrinho</button>
+
+            <table id="tabela-carrinho">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Produto</th>
+                        <th>Qtd</th>
+                        <th>Preço Un.</th>
+                        <th>Subtotal</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody><!-- Via JS --></tbody>
+            </table>
+        </div>
+
+        <!-- Direita: Totais e Finalização -->
+        <div class="painel" style="position: relative;">
+            <div class="total-box">
+                <span style="font-size: 13px; display: block; color: #ccc; font-weight: normal;">TOTAL DO CUPOM</span>
+                R$ <span id="pdv-total-venda">0.00</span>
+            </div>
+
+            <h3>Dados da Venda</h3>
+            
+            <label>Cliente (Busque por Nome ou CPF/CNPJ)</label>
+            <input type="text" id="pdv-busca-cliente" placeholder="Consumidor Não Identificado (Clique para buscar)">
+            <input type="hidden" id="pdv-cliente-id-selecionado">
+            <div id="lista-busca-cliente" class="busca-resultado"></div>
+
+            <label style="margin-top: 15px; display: block;">Meio de Pagamento</label>
+            <select id="pdv-forma-pagamento">
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="PIX">PIX</option>
+                <option value="Cartão">Cartão</option>
+                <option value="CREDITO_LOJA">Crédito Loja (Pendurar)</option>
+            </select>
+
+            <button class="btn-success" id="btn-finalizar-venda" style="width: 100%; padding: 15px; font-size: 18px; margin-top: 20px;">Concluir Venda</button>
+        </div>
+    </div>
+
+    <!-- MODAL 1: SANGRIA E SUPRIMENTO -->
+    <div id="modal-sangria" class="modal">
+        <div class="modal-content">
+            <h3>Movimentação de Valores</h3>
+            <select id="modal-mov-tipo">
+                <option value="Sangria">Sangria (Retirar Dinheiro)</option>
+                <option value="Suprimento">Suprimento (Injetar Troco)</option>
+            </select>
+            <input type="number" id="modal-mov-valor" placeholder="Valor (R$)" step="0.01">
+            <input type="text" id="modal-mov-justificativa" placeholder="Justificativa / Motivo">
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn-success" id="btn-salvar-mov-caixa" style="flex:1;">Lançar</button>
+                <button class="btn-secondary" onclick="fecharModais()" style="flex:1;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: FECHAMENTO DE CAIXA -->
+    <div id="modal-fechamento" class="modal">
+        <div class="modal-content">
+            <h3>Fechamento de Turno</h3>
+            <p><strong>Total Estimado em Caixa:</strong> R$ <span id="txt-valor-esperado">0.00</span></p>
+            <input type="number" id="caixa-valor-contado" placeholder="Valor Físico em Dinheiro (R$)" step="0.01">
+            <input type="text" id="caixa-justificativa-dif" placeholder="Justificativa para diferenças (Opcional)">
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn-danger" id="btn-confirmar-fechamento" style="flex:1;">Fechar Caixa</button>
+                <button class="btn-secondary" onclick="fecharModais()" style="flex:1;">Voltar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./js/auth-guard.js"></script>
+    <script type="module" src="./js/caixa.js"></script>
+    <script>
+        // Função utilitária global para fechar modais na interface
+        function fecharModais() {
+            document.getElementById('modal-sangria').style.display = 'none';
+            document.getElementById('modal-fechamento').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
+

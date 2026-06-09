@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP - Produtos & Estoque</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f4f6f9; }
+        nav { background: #333; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        nav a { color: white; text-decoration: none; margin-right: 15px; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; }
+        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex: 1; min-width: 300px; }
+        input, select { width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #0056b3; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        button.btn-edit { background: #ffc107; color: black; padding: 5px 10px; width: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+<div id="menu-global-container"></div>
+    <div class="container">
+        <div class="box">
+            <h3>Cadastro de Produto</h3>
+            <form id="form-produto">
+                <input type="hidden" id="produto-id">
+                <input type="text" id="codigoBarras" placeholder="Código de Barras" required>
+                <input type="text" id="descricao" placeholder="Descrição do Produto" required>
+                <input type="number" id="valorCusto" placeholder="Preço de Custo (R$)" step="0.01" required>
+                <input type="number" id="valorVenda" placeholder="Preço de Venda (R$)" step="0.01" required>
+                <input type="number" id="estoqueInicial" placeholder="Estoque Inicial" value="0">
+                <button type="submit">Salvar Produto</button>
+            </form>
+
+            <hr style="margin: 25px 0; border: 0; border-top: 1px solid #eee;">
+
+            <h3>Movimentação de Estoque Manual</h3>
+            <form id="form-estoque">
+                <select id="mov-produto-id" required>
+                    <option value="">Selecione o Produto...</option>
+                </select>
+                <select id="mov-tipo" required>
+                    <option value="Entrada">Entrada (+)</option>
+                    <option value="Saída">Saída (-)</option>
+                    <option value="Ajuste">Ajuste (Substituir Total)</option>
+                    <option value="Perda">Perda (-)</option>
+                </select>
+                <input type="number" id="mov-qtd" placeholder="Quantidade" required>
+                <input type="text" id="mov-motivo" placeholder="Motivo / Justificativa" required>
+                <button type="submit" style="background-color: #6c757d;">Registrar Logística</button>
+            </form>
+        </div>
+
+        <div class="box" style="flex: 2;">
+            <h3>Inventário Atual de Produtos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código de Barras</th>
+                        <th>Descrição</th>
+                        <th>Estoque Atual</th>
+                        <th>Preço Venda</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-produtos-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module" src="./js/auth-guard.js"></script>
+    <script type="module" src="./js/produtos.js"></script>
+<script type="module">
+        import { renderizarMenuGlobal } from './js/menu.js';
+        renderizarMenuGlobal('produtos');
+    </script>
+</body>
+</html>
+
