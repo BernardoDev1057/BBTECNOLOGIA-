@@ -1,5 +1,6 @@
 import { db, auth, ref, push, set, get, update } from './firebase-config.js';
 import { dispararMensagemWhatsApp } from './whatsapp.js'; // <-- Adicione esta linha no topo
+import { imprimirComprovante } from './impressora.js';
 
 // Estados de Controle Globais do Turno
 let caixaAtivoId = null;
@@ -45,13 +46,15 @@ async function verificarFluxoCaixa() {
         telaPdv.style.display = 'grid';
         navBtnSangria.style.display = 'inline-block';
         navBtnFechar.style.display = 'inline-block';
-        carregarDadosParaBusca();
+       if (window.toggleBarraCaixa) window.toggleBarraCaixa(true);
+       carregarDadosParaBusca();
     } else {
         // Trava de tela: Exige a abertura
         telaAbertura.style.display = 'block';
         telaPdv.style.display = 'none';
         navBtnSangria.style.display = 'none';
         navBtnFechar.style.display = 'none';
+	if (window.toggleBarraCaixa) window.toggleBarraCaixa(false);
     }
 }
 
@@ -65,7 +68,7 @@ document.getElementById('btn-confirmar-abertura').addEventListener('click', asyn
         valorInicial: troco,
         status: 'Aberto'
     });
-
+   imprimirComprovante("ABERTURA DE CAIXA", `<p>Operador: ${auth.currentUser.email}</p>`);
     alert("Caixa iniciado com sucesso! Boas vendas.");
     verificarFluxoCaixa();
 });
@@ -106,7 +109,18 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
         usuario: auth.currentUser.email,
         dataHora: new Date().toISOString()
     });
-
+   // --- NOVA MENSAGEM E IMPRESSÃO DE MOVIMENTAÇÃO ---
+    const corpoMov = `
+        <div style="font-size: 14px;">
+            <p><strong>Tipo:</strong> ${tipo}</p>
+            <p><strong>Valor:</strong> R$ ${valor.toFixed(2)}</p>
+            <p><strong>Justificativa:</strong> ${justificativa}</p>
+            <p><strong>Operador:</strong> ${auth.currentUser.email}</p>
+        </div>
+    `;
+    
+    // Dispara a impressão automática
+    imprimirComprovante(`COMPROVANTE DE ${tipo.toUpperCase()}`, corpoMov);
     alert(`${tipo} lançado com sucesso!`);
     window.fecharModais();
 });
@@ -117,20 +131,43 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
     if(isNaN(valorContado)) return alert("Digite o valor apurado fisicamente!");
 
     const valorEsperado = parseFloat(document.getElementById('txt-valor-esperado').textContent);
+    const diferenca = valorContado - valorEsperado;
+    const dataFechamento = new Date().toISOString();
 
+    // 1. Grava no Firebase
     await update(ref(db, `caixas/${caixaAtivoId}`), {
         status: 'Fechado',
-        dataHoraFechamento: new Date().toISOString(),
+        dataHoraFechamento: dataFechamento,
         valorEsperado,
         valorContado,
-        diferenca: valorContado - valorEsperado,
+        diferenca: diferenca,
         justificativaDiferenca: document.getElementById('caixa-justificativa-dif').value || ""
     });
 
-    alert("Turno encerrado!");
-    window.location.reload();
-});
+    // 2. Monta o Relatório para Impressão
+    const corpoRelatorio = `
+        <div style="font-size: 13px;">
+            <p><strong>Relatório de Fechamento</strong></p>
+            <p>Operador: ${auth.currentUser.email}</p>
+            <div class="linha"></div>
+            <p><strong>Valor Esperado:</strong> R$ ${valorEsperado.toFixed(2)}</p>
+            <p><strong>Valor Contado:</strong> R$ ${valorContado.toFixed(2)}</p>
+            <div class="linha"></div>
+            <p><strong>Diferença:</strong> R$ ${diferenca.toFixed(2)}</p>
+            <p><strong>Obs:</strong> ${document.getElementById('caixa-justificativa-dif').value || 'Nenhuma'}</p>
+        </div>
+    `;
 
+    // 3. Imprime
+    imprimirComprovante("FECHAMENTO DE CAIXA", corpoRelatorio);
+
+    alert("Turno encerrado e relatório impresso!");
+    
+    // Pequeno delay para garantir que a impressão carregue antes de recarregar a página
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+});
 
 // ==========================================
 // 2. SISTEMA DE BUSCA AVANÇADA (PRODUTO/CLIENTE)
@@ -316,6 +353,30 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         formaPagamento,
         dataHora: new Date().toISOString()
     });
+//IMPRESSAO DO CUPOM
+// 2. Monta o corpo do Cupom para Impressão
+    let itensHtml = carrinho.map(item => `
+        <div style="display: flex; justify-content: space-between;">
+            <span>${item.quantidade}x ${item.descricao}</span>
+            <span>R$ ${item.subtotal.toFixed(2)}</span>
+        </div>
+    `).join('');
+
+    let corpoCupom = `
+        <div style="font-size: 14px;">
+            <p><strong>Operador:</strong> ${auth.currentUser.email}</p>
+            <div class="linha"></div>
+            <strong>ITENS:</strong><br>
+            ${itensHtml}
+            <div class="linha"></div>
+            <p style="font-size: 18px; text-align: right;"><strong>TOTAL: R$ ${totalVendaGlobal.toFixed(2)}</strong></p>
+            <p><strong>Forma de Pagto:</strong> ${formaPagamento}</p>
+        </div>
+    `;
+
+    // 3. Chama a função de impressão que você criou
+    imprimirComprovante("CUPOM FISCAL", corpoCupom);
+
 
 // --- NOVA FUNCIONALIDADE: DISPARO DO CUPOM VIA WHATSAPP ---
     if (clienteId && listaClientesMemoria[clienteId]) {

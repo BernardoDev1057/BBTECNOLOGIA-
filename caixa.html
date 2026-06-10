@@ -120,20 +120,24 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="./js/auth-guard.js"></script>
-    <script type="module">
-        import { renderizarMenuGlobal } from './js/menu.js';
-        renderizarMenuGlobal('caixa');
+<script type="module">
+    import { renderizarMenuGlobal } from './js/menu.js';
+    renderizarMenuGlobal('caixa');
 
-        const checarAberturaLayout = setInterval(() => {
-            const pdvVisivel = document.getElementById('tela-pdv').style.display === 'flex' || document.getElementById('tela-pdv').style.display === 'row';
-            document.getElementById('barra-auxiliar-caixa').style.display = pdvVisivel ? 'block' : 'none';
-        }, 1000);
-        
-        // Mapeamento dos modais Bootstrap para os botões do caixa.js usarem nativamente
-        document.getElementById('nav-btn-sangria').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('modal-sangria')).show(); });
-        document.getElementById('nav-btn-fechar').addEventListener('click', () => { new bootstrap.Modal(document.getElementById('modal-fechamento')).show(); });
-    </script>
-    <script type="module" src="./js/caixa.js"></script>
+    // Inicializa os modais do Bootstrap apenas uma vez
+    window.modalSangria = new bootstrap.Modal(document.getElementById('modal-sangria'));
+    window.modalFechamento = new bootstrap.Modal(document.getElementById('modal-fechamento'));
+
+    // Configura os cliques dos botões da barra superior
+    document.getElementById('nav-btn-sangria').addEventListener('click', () => window.modalSangria.show());
+    document.getElementById('nav-btn-fechar').addEventListener('click', () => window.modalFechamento.show());
+
+    // Função para ser chamada pelo caixa.js para mostrar/esconder a barra
+    window.toggleBarraCaixa = (mostrar) => {
+        document.getElementById('barra-auxiliar-caixa').style.display = mostrar ? 'block' : 'none';
+    };
+</script>
+<script type="module" src="./js/caixa.js"></script>
 </body>
 </html>
 
