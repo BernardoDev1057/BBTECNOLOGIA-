@@ -8,7 +8,7 @@ export function renderizarMenuGlobal(paginaAtiva) {
     localMenu.innerHTML = `
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 rounded shadow-sm">
             <div class="container-fluid">
-                <a class="navbar-brand fw-bold" href="dashboard.html">🚀 ERP Control</a>
+                <a class="navbar-brand fw-bold" href="dashboard.html">🚀 PAINEL DE CONTROLE</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
@@ -31,6 +31,9 @@ export function renderizarMenuGlobal(paginaAtiva) {
                         </li>
                         <li class="nav-item">
                             <a class="nav-link ${paginaAtiva === 'relatorios' ? 'active fw-bold text-primary' : ''}" href="relatorios.html">Relatórios</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link ${paginaAtiva === 'ajustes' ? 'active fw-bold text-primary' : ''}" href="ajustes.html">Ajustes Preços</a>
                         </li>
                     </ul>
                     <button id="btn-logout-global" class="btn btn-danger btn-sm fw-bold w-sm-100 mt-2 mt-lg-0">Sair (Logout)</button>
