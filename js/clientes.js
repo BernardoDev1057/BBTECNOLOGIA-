@@ -1,16 +1,14 @@
 import { db, ref, push, set, get, update } from './firebase-config.js';
 import { dispararMensagemWhatsApp } from './whatsapp.js';
+import { imprimirComprovante } from './impressora.js';
 
 const formCliente = document.getElementById('form-cliente');
 const btnCancelar = document.getElementById('btn-cancelar');
 const formTitulo = document.getElementById('form-titulo');
 
-// Evento de Gravação (Inclusão ou Edição)
 formCliente.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const id = document.getElementById('cliente-id').value;
-    
     const clienteData = {
         nome: document.getElementById('cliente-nome').value,
         cpf: document.getElementById('cliente-cpf').value || '',
@@ -26,108 +24,105 @@ formCliente.addEventListener('submit', async (e) => {
         await update(ref(db, 'clientes/' + id), clienteData);
     } else {
         clienteData.saldoDevedor = 0;
-        const novoClienteRef = push(ref(db, 'clientes'));
-        await set(novoClienteRef, clienteData);
+        await set(push(ref(db, 'clientes')), clienteData);
     }
-
     resetarFormulario();
     renderizarTabelaClientes();
 });
 
-// Busca dados do Firebase e popula a lista
 async function renderizarTabelaClientes() {
     const tabela = document.getElementById('tabela-clientes');
     if (!tabela) return;
-
     tabela.innerHTML = '';
     const snapshot = await get(ref(db, 'clientes'));
-
     if (snapshot.exists()) {
         const clientes = snapshot.val();
         for (let id in clientes) {
             const c = clientes[id];
             const tr = document.createElement('tr');
-
-            const cpfExibicao = c.cpf ? c.cpf : '---';
-            const limite = c.limiteCredito ? parseFloat(c.limiteCredito).toFixed(2) : '0.00';
             const saldoDevedor = c.saldoDevedor || 0;
-            const saldoExibicao = parseFloat(saldoDevedor).toFixed(2);
+            const botaoZap = saldoDevedor > 0 ? `<button class="btn btn-sm btn-outline-success btn-zap" data-id="${id}">💬 Cobrar</button>` : '<span class="text-muted small">Em dia</span>';
             
-            let enderecoCompleto = 'Não informado';
-            if (c.rua || c.bairro) {
-                enderecoCompleto = c.rua + (c.bairro ? ', ' + c.bairro : '') + (c.cidade ? ' - ' + c.cidade : '');
-            }
-
-            // Condicional do botão do zap recuperado da sua versão original
-            let botaoZap = '<span class="text-muted small">Em dia</span>';
-            if (saldoDevedor > 0) {
-                botaoZap = '<button class="btn btn-sm btn-outline-success btn-zap" data-id="' + id + '">💬 Cobrar</button>';
-            }
-
-            tr.innerHTML = '<td>' + c.nome + '</td>' +
-                           '<td><code>' + cpfExibicao + '</code></td>' +
-                           '<td>' + c.telefone + '</td>' +
-                           '<td><small class="text-muted">' + enderecoCompleto + '</small></td>' +
-                           '<td><span class="badge bg-secondary">' + c.tipo + '</span></td>' +
-                           '<td>R$ ' + limite + '</td>' +
-                           '<td><strong class="' + (saldoDevedor > 0 ? 'text-danger' : 'text-success') + '">R$ ' + saldoExibicao + '</strong></td>' +
-                           '<td><button class="btn btn-sm btn-warning btn-editar" data-id="' + id + '">Editar</button></td>' +
-                           '<td>' + botaoZap + '</td>';
-
+            tr.innerHTML = `
+                <td>${c.nome}</td><td><code>${c.cpf || '---'}</code></td><td>${c.telefone}</td>
+                <td><small class="text-muted">${c.rua || ''}</small></td><td><span class="badge bg-secondary">${c.tipo}</span></td>
+                <td>R$ ${parseFloat(c.limiteCredito).toFixed(2)}</td>
+                <td><strong class="${saldoDevedor > 0 ? 'text-danger' : 'text-success'}">R$ ${parseFloat(saldoDevedor).toFixed(2)}</strong></td>
+                <td>
+                    <button class="btn btn-sm btn-warning btn-editar" data-id="${id}">Editar</button>
+                    <button class="btn btn-sm btn-info btn-extrato" data-id="${id}" data-nome="${c.nome}">Extrato</button>
+                </td>
+                <td>${botaoZap}</td>`;
             tabela.appendChild(tr);
         }
-
-        // Evento dos botões dinâmicos de Edição
-        document.querySelectorAll('.btn-editar').forEach(btn => {
-            btn.addEventListener('click', () => carregarClienteParaEdicao(btn.getAttribute('data-id')));
-        });
-
-        // Evento dos botões dinâmicos de Cobrança (Função nativa do seu sistema)
-        document.querySelectorAll('.btn-zap').forEach(btn => {
-            btn.addEventListener('click', () => enviarMensagemCobranca(btn.getAttribute('data-id')));
-        });
-    } else {
-        tabela.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">Nenhum cliente cadastrado.</td></tr>';
+        document.querySelectorAll('.btn-editar').forEach(b => b.addEventListener('click', () => carregarClienteParaEdicao(b.getAttribute('data-id'))));
+        document.querySelectorAll('.btn-zap').forEach(b => b.addEventListener('click', () => enviarMensagemCobranca(b.getAttribute('data-id'))));
+        document.querySelectorAll('.btn-extrato').forEach(b => b.addEventListener('click', () => abrirExtratoCliente(b.getAttribute('data-id'), b.getAttribute('data-nome'))));
     }
 }
 
-// Resgata o registro selecionado e joga nos inputs
-async function carregarClienteParaEdicao(id) {
-    const snapshot = await get(ref(db, 'clientes/' + id));
-    if (snapshot.exists()) {
-        const c = snapshot.val();
+async function buscarHistoricoComprasCliente(clienteId) {
+    const vendasSnap = await get(ref(db, 'vendas'));
+    if (!vendasSnap.exists()) return [];
+    const historico = [];
+    Object.values(vendasSnap.val()).forEach(v => {
+        if (v.clienteId === clienteId) historico.push(v);
+    });
+    return historico.sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora));
+}
 
+window.imprimirExtrato = async (clienteId, nomeCliente) => {
+    const historico = await buscarHistoricoComprasCliente(clienteId);
+    const snapCliente = await get(ref(db, 'clientes/' + clienteId));
+    const saldo = snapCliente.exists() ? (snapCliente.val().saldoDevedor || 0) : 0;
+    
+    let itensHtml = historico.map(v => `<div style="display: flex; justify-content: space-between;"><span>${new Date(v.dataHora).toLocaleDateString('pt-BR')}</span><span>R$ ${v.total.toFixed(2)}</span></div>`).join('');
+    
+    const corpoExtrato = `<div style="font-family: Arial; font-size: 12px;"><h4>EXTRATO: ${nomeCliente}</h4><hr>${itensHtml}<hr><p><strong>SALDO DEVEDOR: R$ ${saldo.toFixed(2)}</strong></p><br><br><div style="text-align:center">____________________<br>Assinatura</div></div>`;
+    imprimirComprovante("EXTRATO CLIENTE", corpoExtrato);
+};
+
+async function abrirExtratoCliente(id, nome) {
+    const historico = await buscarHistoricoComprasCliente(id);
+    let html = `<ul class="list-group">`;
+    historico.forEach(v => html += `<li class="list-group-item">${new Date(v.dataHora).toLocaleDateString()} - R$ ${v.total.toFixed(2)}</li>`);
+    html += `</ul><button class="btn btn-primary w-100 mt-3" onclick="imprimirExtrato('${id}', '${nome}')">🖨️ Imprimir Extrato</button>`;
+    document.getElementById('conteudo-modal-extrato').innerHTML = html;
+    new bootstrap.Modal(document.getElementById('modal-extrato')).show();
+}
+
+async function carregarClienteParaEdicao(id) {
+    const s = await get(ref(db, 'clientes/' + id));
+    if (s.exists()) {
+        const c = s.val();
         document.getElementById('cliente-id').value = id;
         document.getElementById('cliente-nome').value = c.nome;
-        document.getElementById('cliente-cpf').value = c.cpf || '';
         document.getElementById('cliente-telefone').value = c.telefone;
-        document.getElementById('cliente-rua').value = c.rua || '';
-        document.getElementById('cliente-bairro').value = c.bairro || '';
-        document.getElementById('cliente-cidade').value = c.cidade || '';
-        document.getElementById('cliente-tipo').value = c.tipo;
-        document.getElementById('cliente-limite').value = c.limiteCredito || 0;
-
-        formTitulo.innerText = 'Editando Cadastro: ' + c.nome;
+        formTitulo.innerText = 'Editando: ' + c.nome;
         btnCancelar.style.display = 'inline-block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
-// Envia a régua de cobrança customizada usando o arquivo whatsapp.js externo
 async function enviarMensagemCobranca(id) {
-    const snapshot = await get(ref(db, 'clientes/' + id));
-    if (snapshot.exists()) {
-        const c = snapshot.val();
-        const saldo = c.saldoDevedor || 0;
-        const limite = c.limiteCredito || 0;
+    const s = await get(ref(db, 'clientes/' + id));
+    if (s.exists()) {
+        const c = s.val();
+        
+        const nome = c.nome;
+        const saldoDevedor = parseFloat(c.saldoDevedor) || 0;
+        const limiteTotal = parseFloat(c.limiteCredito) || 0;
+        
+        // Limite disponível é o total cadastrado menos o que o cliente já deve
+        const limiteDisponivel = Math.max(0, limiteTotal - saldoDevedor);
 
-        let msgCobranca = "Olá, *" + c.nome + "*! Tudo bem?  🌟\n\n";
-        msgCobranca += "Passando para enviar o extrato atualizado da sua conta de *Crédito Confiança* na nossa loja.\n\n";
-        msgCobranca += "📌 *Saldo Devedor Atual:* R$ " + parseFloat(saldo).toFixed(2) + "\n";
-        msgCobranca += "📈 *Seu Limite de Crédito:* R$ " + parseFloat(limite).toFixed(2) + "\n\n";
-        msgCobranca += "Caso queira realizar o pagamento via PIX ou dinheiro, entre em contato conosco por aqui para darmos a baixa na sua ficha. Obrigado pela parceria! 🤝";
+        const textoMensagem = `Sra. ${nome},\n\n` +
+            `📌 *Saldo em aberto:* R$ ${saldoDevedor.toFixed(2)}\n` +
+            `📈 *Limite disponível:* R$ ${limiteDisponivel.toFixed(2)}\n\n` +
+            `Para liquidação imediata via PIX ou pagamento em espécie, responda esta mensagem. Nossa equipe realizará a baixa na sua conta com total discrição.\n\n` +
+            `Atenciosamente,`;
 
-        dispararMensagemWhatsApp(c.telefone, msgCobranca);
+        dispararMensagemWhatsApp(c.telefone, textoMensagem);
     }
 }
 
@@ -139,7 +134,4 @@ function resetarFormulario() {
 }
 
 btnCancelar.addEventListener('click', resetarFormulario);
-
-// Inicialização
 renderizarTabelaClientes();
-
