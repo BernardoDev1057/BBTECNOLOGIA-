@@ -39,7 +39,7 @@ document.getElementById('contas-busca-cliente').addEventListener('input', (e) =>
             divResultados.appendChild(item);
         }
     });
-    divResultados.style.display = filtrados > 0? 'block' : 'none';
+    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
 });
 
 // Esconde busca ao clicar fora
@@ -71,7 +71,7 @@ async function carregarHistoricoTitulos(clienteId) {
             if (r.clienteId === clienteId) {
                 // Se não mostrar cancelados, filtra eles
                 if (!mostrarCancelados && r.cancelado) return;
-                titulosEncontrados.push({ id,...r });
+                titulosEncontrados.push({ id, ...r });
             }
         });
 
@@ -97,12 +97,12 @@ async function carregarHistoricoTitulos(clienteId) {
                 txtStatus = `<span class="badge bg-warning text-dark">⚠️ Em Aberto</span>`;
             }
 
-            const dataPagamento = t.dataPagamento? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
+            const dataPagamento = t.dataPagamento ? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
 
             let botaoAcao = '';
-            if (t.status === 'Aberto' &&!t.cancelado) {
+            if (t.status === 'Aberto' && !t.cancelado) {
                 botaoAcao = `<button class="btn btn-sm btn-success" onclick="window.quitarTitulo('${t.id}', ${t.valor}, '${clienteId}')">Baixar</button>`;
-            } else if (t.status === 'Pago' &&!t.cancelado) {
+            } else if (t.status === 'Pago' && !t.cancelado) {
                 botaoAcao = `
                     <button class="btn btn-sm btn-outline-primary" onclick="window.gerarComprovante('${t.id}')">Comprovante</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="window.estornarBaixa('${t.id}', ${t.valor}, '${clienteId}')">Estornar</button>
@@ -126,62 +126,61 @@ async function carregarHistoricoTitulos(clienteId) {
 // BAIXA - NÃO AFETA CAIXA
 window.quitarTitulo = async (tituloId, valor, clienteId) => {
     const cliente = listaClientesMemoria[clienteId];
-    const conf = confirm(`Confirmar baixa de R$ ${valor.toFixed(2)} para ${cliente.nome}?`);
-    if (!conf) return;
+    
+    window.mostrarConfirmacaoSistema(`Confirmar baixa de R$ ${valor.toFixed(2)} para ${cliente.nome}?`, async () => {
+        const dataPagamento = new Date().toISOString();
+        const usuario = auth.currentUser.email;
+        const saldoAnterior = cliente.saldoDevedor || 0;
+        const novoSaldo = Math.max(0, saldoAnterior - valor);
 
-    const dataPagamento = new Date().toISOString();
-    const usuario = auth.currentUser.email;
-    const saldoAnterior = cliente.saldoDevedor || 0;
-    const novoSaldo = Math.max(0, saldoAnterior - valor);
+        // 1. Marca título como Pago
+        await update(ref(db, `contasReceber/${tituloId}`), {
+            status: 'Pago',
+            dataPagamento: dataPagamento,
+            cancelado: false,
+            usuarioBaixa: usuario
+        });
 
-    // 1. Marca título como Pago
-    await update(ref(db, `contasReceber/${tituloId}`), {
-        status: 'Pago',
-        dataPagamento: dataPagamento,
-        cancelado: false,
-        usuarioBaixa: usuario
+        // 2. Atualiza saldo do cliente
+        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: novoSaldo });
+
+        window.mostrarAlertaSistema("Baixa realizada com sucesso!", "Sucesso");
+
+        // 3. Gera comprovante
+        window.gerarComprovante(tituloId);
+
+        // 4. Envia WhatsApp
+        if (cliente.telefone) {
+            const msg = `Olá ${cliente.nome}!\n\nRecebemos o pagamento de R$ ${valor.toFixed(2)} referente ao seu débito.\nData: ${new Date(dataPagamento).toLocaleString('pt-BR')}\nSaldo devedor restante: R$ ${novoSaldo.toFixed(2)}\n\nObrigado pela preferência!`;
+            dispararMensagemWhatsApp(cliente.telefone, msg);
+        }
+
+        await carregarClientesCache();
+        carregarHistoricoTitulos(clienteId);
     });
-
-    // 2. Atualiza saldo do cliente
-    await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: novoSaldo });
-
-    alert("Baixa realizada com sucesso!");
-
-    // 3. Gera comprovante
-    gerarComprovante(tituloId);
-
-    // 4. Envia WhatsApp
-    if (cliente.telefone) {
-        const msg = `Olá ${cliente.nome}!\n\nRecebemos o pagamento de R$ ${valor.toFixed(2)} referente ao seu débito.\nData: ${new Date(dataPagamento).toLocaleString('pt-BR')}\nSaldo devedor restante: R$ ${novoSaldo.toFixed(2)}\n\nObrigado pela preferência!`;
-        dispararMensagemWhatsApp(cliente.telefone, msg);
-    }
-
-    await carregarClientesCache();
-    carregarHistoricoTitulos(clienteId);
 };
 
 // SOFT DELETE / ESTORNO
 window.estornarBaixa = async (tituloId, valor, clienteId) => {
-    const conf = confirm(`Estornar esta baixa? O título voltará para "Em Aberto" e o saldo será restaurado.`);
-    if (!conf) return;
+    window.mostrarConfirmacaoSistema(`Estornar esta baixa? O título voltará para "Em Aberto" e o saldo será restaurado.`, async () => {
+        const cliente = listaClientesMemoria[clienteId];
+        const saldoAtual = cliente.saldoDevedor || 0;
 
-    const cliente = listaClientesMemoria[clienteId];
-    const saldoAtual = cliente.saldoDevedor || 0;
+        await update(ref(db, `contasReceber/${tituloId}`), {
+            status: 'Aberto',
+            dataPagamento: null,
+            cancelado: true,
+            motivoCancelamento: 'Estorno de baixa',
+            usuarioEstorno: auth.currentUser.email,
+            dataEstorno: new Date().toISOString()
+        });
 
-    await update(ref(db, `contasReceber/${tituloId}`), {
-        status: 'Aberto',
-        dataPagamento: null,
-        cancelado: true,
-        motivoCancelamento: 'Estorno de baixa',
-        usuarioEstorno: auth.currentUser.email,
-        dataEstorno: new Date().toISOString()
+        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: saldoAtual + valor });
+
+        window.mostrarAlertaSistema("Baixa estornada com sucesso!", "Sucesso");
+        await carregarClientesCache();
+        carregarHistoricoTitulos(clienteId);
     });
-
-    await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: saldoAtual + valor });
-
-    alert("Baixa estornada com sucesso!");
-    await carregarClientesCache();
-    carregarHistoricoTitulos(clienteId);
 };
 
 // GERA COMPROVANTE usando impressora.js
@@ -203,7 +202,8 @@ window.gerarComprovante = async (tituloId) => {
     imprimirComprovante('Comprovante de Baixa - Crédito Loja', corpo);
 };
 
-// Init
-setTimeout(() => {
+// Inicialização baseada em eventos nativos do ciclo do DOM
+document.addEventListener('DOMContentLoaded', () => {
     carregarClientesCache();
-}, 1000);
+});
+

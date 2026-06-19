@@ -24,10 +24,8 @@ let produtoSelecionadoId = null;
 // ==========================================
 async function verificarFluxoCaixa() {
     if (!auth.currentUser) return;
-
     const snapshot = await get(ref(db, 'caixas'));
     let caixaAberto = false;
-
     if (snapshot.exists()) {
         for (let id in snapshot.val()) {
             const cx = snapshot.val()[id];
@@ -39,7 +37,6 @@ async function verificarFluxoCaixa() {
             }
         }
     }
-
     if (caixaAberto) {
         telaAbertura.style.display = 'none';
         telaPdv.style.display = 'grid';
@@ -59,7 +56,6 @@ async function verificarFluxoCaixa() {
 // Botão: Abrir Turno
 document.getElementById('btn-confirmar-abertura').addEventListener('click', async () => {
     const troco = parseFloat(document.getElementById('caixa-troco-inicial').value) || 0;
-
     await set(push(ref(db, 'caixas')), {
         operador: auth.currentUser.email,
         dataHoraAbertura: new Date().toISOString(),
@@ -67,7 +63,7 @@ document.getElementById('btn-confirmar-abertura').addEventListener('click', asyn
         status: 'Aberto'
     });
     imprimirComprovante("ABERTURA DE CAIXA", `<p>Operador: ${auth.currentUser.email}</p>`);
-    alert("Caixa iniciado com sucesso! Boas vendas.");
+    window.mostrarAlertaSistema("Caixa iniciado com sucesso! Boas vendas.", "Frente de Caixa");
     verificarFluxoCaixa();
 });
 
@@ -75,18 +71,23 @@ document.getElementById('btn-confirmar-abertura').addEventListener('click', asyn
 navBtnSangria.addEventListener('click', () => window.modalSangria.show());
 navBtnFechar.addEventListener('click', async () => {
     window.modalFechamento.show();
-
     let totalSuprimentos = 0, totalSangrias = 0, totalDinheiroVendas = 0;
-
+    
     const sup = await get(ref(db, 'suprimentos'));
-    if(sup.exists()) Object.values(sup.val()).forEach(s => { if(s.caixaId === caixaAtivoId) totalSuprimentos += s.valor; });
-
+    if(sup.exists()) Object.values(sup.val()).forEach(s => {
+        if(s.caixaId === caixaAtivoId) totalSuprimentos += s.valor;
+    });
+    
     const san = await get(ref(db, 'sangrias'));
-    if(san.exists()) Object.values(san.val()).forEach(s => { if(s.caixaId === caixaAtivoId) totalSangrias += s.valor; });
-
+    if(san.exists()) Object.values(san.val()).forEach(s => {
+        if(s.caixaId === caixaAtivoId) totalSangrias += s.valor;
+    });
+    
     const ven = await get(ref(db, 'vendas'));
-    if(ven.exists()) Object.values(ven.val()).forEach(v => { if(v.caixaId === caixaAtivoId && v.formaPagamento === 'Dinheiro') totalDinheiroVendas += v.total; });
-
+    if(ven.exists()) Object.values(ven.val()).forEach(v => {
+        if(v.caixaId === caixaAtivoId && v.formaPagamento === 'Dinheiro') totalDinheiroVendas += v.total;
+    });
+    
     document.getElementById('txt-valor-esperado').textContent = (valorInicialTroco + totalDinheiroVendas + totalSuprimentos - totalSangrias).toFixed(2);
 });
 
@@ -95,10 +96,12 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
     const tipo = document.getElementById('modal-mov-tipo').value;
     const valor = parseFloat(document.getElementById('modal-mov-valor').value);
     const justificativa = document.getElementById('modal-mov-justificativa').value;
-
-    if(isNaN(valor) ||!justificativa) return alert("Preencha todos os campos da movimentação!");
-
-    const destino = tipo === 'Suprimento'? 'suprimentos' : 'sangrias';
+    
+    if(isNaN(valor) || !justificativa) {
+        return window.mostrarAlertaSistema("Preencha todos os campos da movimentação!", "Validação");
+    }
+    
+    const destino = tipo === 'Suprimento' ? 'suprimentos' : 'sangrias';
     await set(push(ref(db, destino)), {
         caixaId: caixaAtivoId,
         valor,
@@ -106,7 +109,7 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
         usuario: auth.currentUser.email,
         dataHora: new Date().toISOString()
     });
-
+    
     const corpoMov = `
         <div style="font-size: 14px;">
             <p><strong>Tipo:</strong> ${tipo}</p>
@@ -116,9 +119,8 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
         </div>
     `;
     imprimirComprovante(`COMPROVANTE DE ${tipo.toUpperCase()}`, corpoMov);
-    alert(`${tipo} lançado com sucesso!`);
-
-    // CORREÇÃO: fecha modal Bootstrap 5 corretamente
+    window.mostrarAlertaSistema(`${tipo} lançado com sucesso!`, "Movimentação Efetuada");
+    
     window.modalSangria.hide();
     document.getElementById('modal-mov-valor').value = '';
     document.getElementById('modal-mov-justificativa').value = '';
@@ -127,12 +129,12 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
 // Confirmar Encerramento de Caixa
 document.getElementById('btn-confirmar-fechamento').addEventListener('click', async () => {
     const valorContado = parseFloat(document.getElementById('caixa-valor-contado').value);
-    if(isNaN(valorContado)) return alert("Digite o valor apurado fisicamente!");
-
+    if(isNaN(valorContado)) return window.mostrarAlertaSistema("Digite o valor apurado fisicamente!", "Validação");
+    
     const valorEsperado = parseFloat(document.getElementById('txt-valor-esperado').textContent);
     const diferenca = valorContado - valorEsperado;
     const dataFechamento = new Date().toISOString();
-
+    
     await update(ref(db, `caixas/${caixaAtivoId}`), {
         status: 'Fechado',
         dataHoraFechamento: dataFechamento,
@@ -141,7 +143,7 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
         diferenca: diferenca,
         justificativaDiferenca: document.getElementById('caixa-justificativa-dif').value || ""
     });
-
+    
     const corpoRelatorio = `
         <div style="font-size: 13px;">
             <p><strong>Relatório de Fechamento</strong></p>
@@ -155,11 +157,9 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
         </div>
     `;
     imprimirComprovante("FECHAMENTO DE CAIXA", corpoRelatorio);
-    alert("Turno encerrado e relatório impresso!");
-
-    // CORREÇÃO: fecha modal antes de reload
+    window.mostrarAlertaSistema("Turno encerrado e relatório impresso!", "Caixa Fechado");
+    
     window.modalFechamento.hide();
-
     setTimeout(() => {
         window.location.reload();
     }, 1000);
@@ -171,7 +171,7 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
 async function carregarDadosParaBusca() {
     const prodSnap = await get(ref(db, 'produtos'));
     if(prodSnap.exists()) listaProdutosMemoria = prodSnap.val();
-
+    
     const cliSnap = await get(ref(db, 'clientes'));
     if(cliSnap.exists()) listaClientesMemoria = cliSnap.val();
 }
@@ -181,9 +181,12 @@ document.getElementById('pdv-busca-produto').addEventListener('input', (e) => {
     const termo = e.target.value.toLowerCase().trim();
     const divResultados = document.getElementById('lista-busca-produto');
     divResultados.innerHTML = '';
-
-    if (!termo) { divResultados.style.display = 'none'; return; }
-
+    
+    if (!termo) {
+        divResultados.style.display = 'none';
+        return;
+    }
+    
     let filtrados = 0;
     Object.entries(listaProdutosMemoria).forEach(([id, p]) => {
         if (p.descricao.toLowerCase().includes(termo) || p.codigoBarras.includes(termo)) {
@@ -199,8 +202,7 @@ document.getElementById('pdv-busca-produto').addEventListener('input', (e) => {
             divResultados.appendChild(item);
         }
     });
-
-    divResultados.style.display = filtrados > 0? 'block' : 'none';
+    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
 });
 
 // Busca de clientes
@@ -208,9 +210,12 @@ document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
     const termo = e.target.value.toLowerCase().trim();
     const divResultados = document.getElementById('lista-busca-cliente');
     divResultados.innerHTML = '';
-
-    if(!termo) { divResultados.style.display = 'none'; return; }
-
+    
+    if(!termo) {
+        divResultados.style.display = 'none';
+        return;
+    }
+    
     let filtrados = 0;
     Object.entries(listaClientesMemoria).forEach(([id, c]) => {
         const doc = c.cpf || "";
@@ -227,7 +232,7 @@ document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
             divResultados.appendChild(item);
         }
     });
-    divResultados.style.display = filtrados > 0? 'block' : 'none';
+    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
 });
 
 // ==========================================
@@ -235,7 +240,6 @@ document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
 // ==========================================
 document.getElementById('btn-adicionar-item').addEventListener('click', () => {
     const qtd = parseFloat(document.getElementById('pdv-qtd').value) || 1;
-
     if (produtoSelecionadoId && listaProdutosMemoria[produtoSelecionadoId]) {
         inserirNoCarrinho(produtoSelecionadoId, listaProdutosMemoria[produtoSelecionadoId], qtd);
     } else {
@@ -244,23 +248,20 @@ document.getElementById('btn-adicionar-item').addEventListener('click', () => {
         Object.entries(listaProdutosMemoria).forEach(([id, p]) => {
             if(p.codigoBarras === textoInput) achadoId = id;
         });
-
         if(achadoId) {
             inserirNoCarrinho(achadoId, listaProdutosMemoria[achadoId], qtd);
         } else {
-            alert("Produto não selecionado ou código de barras inválido!");
+            window.mostrarAlertaSistema("Produto não selecionado ou código de barras inválido!", "Atenção");
         }
     }
 });
 
 function inserirNoCarrinho(id, itemDados, qtd) {
     let precoAplicado = itemDados.valorVenda;
-
     // REGRA ATACADO - PADRÃO ÚNICO: precoAtacado / quantidadeMinimaAtacado
     if(itemDados.quantidadeMinimaAtacado && qtd >= itemDados.quantidadeMinimaAtacado && itemDados.precoAtacado > 0) {
         precoAplicado = itemDados.precoAtacado;
     }
-
     carrinho.push({
         id: id,
         descricao: itemDados.descricao,
@@ -268,11 +269,9 @@ function inserirNoCarrinho(id, itemDados, qtd) {
         precoUnitario: precoAplicado,
         subtotal: precoAplicado * qtd
     });
-
     document.getElementById('pdv-busca-produto').value = '';
     document.getElementById('pdv-qtd').value = 1;
     produtoSelecionadoId = null;
-
     renderizarCarrinhoHTML();
 }
 
@@ -280,7 +279,6 @@ function renderizarCarrinhoHTML() {
     const tbody = document.getElementById('tabela-carrinho').querySelector('tbody');
     tbody.innerHTML = '';
     totalVendaGlobal = 0;
-
     carrinho.forEach((item, index) => {
         totalVendaGlobal += item.subtotal;
         const tr = document.createElement('tr');
@@ -294,10 +292,10 @@ function renderizarCarrinhoHTML() {
         `;
         tbody.appendChild(tr);
     });
-
     document.getElementById('pdv-total-venda').textContent = totalVendaGlobal.toFixed(2);
 }
 
+// Vincula explicitamente a função ao escopo global (window) antes de ser invocada pela árvore DOM
 window.removerItemCarrinho = (index) => {
     carrinho.splice(index, 1);
     renderizarCarrinhoHTML();
@@ -305,29 +303,29 @@ window.removerItemCarrinho = (index) => {
 
 // Fechamento de Cupom
 document.getElementById('btn-finalizar-venda').addEventListener('click', async () => {
-    if(carrinho.length === 0) return alert("Carrinho vazio!");
-
+    if(carrinho.length === 0) return window.mostrarAlertaSistema("Carrinho vazio!", "Aviso");
     const clienteId = document.getElementById('pdv-cliente-id-selecionado').value;
     const formaPagamento = document.getElementById('pdv-forma-pagamento').value;
-
+    
     // Fiado: valida limite e cria conta a receber
     if (formaPagamento === 'CREDITO_LOJA') {
-        if(!clienteId) return alert("Venda fiada rejeitada: Selecione um cliente!");
-
+        if(!clienteId) return window.mostrarAlertaSistema("Venda fiada rejeitada: Selecione um cliente!", "Bloqueio");
         const cliSnap = await get(ref(db, `clientes/${clienteId}`));
         const cli = cliSnap.val();
         const dividaFinal = (cli.saldoDevedor || 0) + totalVendaGlobal;
-
+        
         if(dividaFinal > cli.limiteCredito) {
-            return alert(`BLOQUEADO: Compra excede o limite do cliente (Limite: R$ ${cli.limiteCredito.toFixed(2)})`);
+            return window.mostrarAlertaSistema(`BLOQUEADO: Compra excede o limite do cliente (Limite: R$ ${cli.limiteCredito.toFixed(2)})`, "Limite Excedido");
         }
-
         await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: dividaFinal });
         await set(push(ref(db, 'contasReceber')), {
-            clienteId, valor: totalVendaGlobal, status: 'Aberto', dataLancamento: new Date().toISOString()
+            clienteId,
+            valor: totalVendaGlobal,
+            status: 'Aberto',
+            dataLancamento: new Date().toISOString()
         });
     }
-
+    
     // Abate o estoque
     for (let item of carrinho) {
         const pSnap = await get(ref(db, `produtos/${item.id}`));
@@ -335,8 +333,8 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             await update(ref(db, `produtos/${item.id}`), { estoque: (pSnap.val().estoque || 0) - item.quantidade });
         }
     }
-
-    // GRAVA VENDA - AGORA SEMPRE COM clienteId
+    
+    // GRAVA VENDA - SEMPRE COM clienteId
     await set(push(ref(db, 'vendas')), {
         caixaId: caixaAtivoId,
         operador: auth.currentUser.email,
@@ -346,16 +344,13 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         formaPagamento,
         dataHora: new Date().toISOString()
     });
-
+    
     // Impressão do Cupom
     let itensHtml = carrinho.map(item => `
-        <div style="display: flex; justify-content: space-between;">
-            <span>${item.quantidade}x ${item.descricao}</span>
-            <span>R$ ${item.subtotal.toFixed(2)}</span>
-        </div>
+        <div style="display: flex; justify-content: space-between;"><span>${item.quantidade}x ${item.descricao}</span><span>R$ ${item.subtotal.toFixed(2)}</span></div>
     `).join('');
-
-    let corpoCupom = `
+    
+    let cuerpoCupom = `
         <div style="font-size: 14px;">
             <p><strong>Operador:</strong> ${auth.currentUser.email}</p>
             <div class="linha"></div>
@@ -366,14 +361,12 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             <p><strong>Forma de Pagto:</strong> ${formaPagamento}</p>
         </div>
     `;
-    imprimirComprovante("CUPOM FISCAL", corpoCupom);
-
+    imprimirComprovante("CUPOM FISCAL", cuerpoCupom);
+    
     // WhatsApp pro cliente se selecionado
     if (clienteId && listaClientesMemoria[clienteId]) {
         const dadosCliente = listaClientesMemoria[clienteId];
-        const querEnviar = confirm(`Venda salva! Deseja enviar o Cupom Digital para o WhatsApp de ${dadosCliente.nome}?`);
-
-        if (querEnviar) {
+        window.mostrarConfirmacaoSistema(`Venda salva! Deseja enviar o Cupom Digital para o WhatsApp de ${dadosCliente.nome}?`, () => {
             let cupomTexto = `🛍️ *CUPOM FISCAL DIGITAL*\n`;
             cupomTexto += `----------------------------------------\n`;
             cupomTexto += `📅 Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n`;
@@ -385,17 +378,16 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             cupomTexto += `----------------------------------------\n`;
             cupomTexto += `💰 TOTAL: R$ ${totalVendaGlobal.toFixed(2)}\n`;
             cupomTexto += `💳 Pagamento: ${formaPagamento}\n\nObrigado pela preferência!`;
-
             dispararMensagemWhatsApp(dadosCliente.telefone, cupomTexto);
-        }
+        });
     }
-
+    
     // Reset carrinho
     carrinho = [];
     document.getElementById('pdv-cliente-id-selecionado').value = '';
     document.getElementById('pdv-busca-cliente').value = '';
     renderizarCarrinhoHTML();
-    alert("Venda finalizada com sucesso!");
+    window.mostrarAlertaSistema("Venda finalizada com sucesso!", "Frente de Caixa");
 });
 
 verificarFluxoCaixa();

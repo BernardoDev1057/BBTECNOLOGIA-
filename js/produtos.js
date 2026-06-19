@@ -37,7 +37,7 @@ formProduto.addEventListener('submit', async (e) => {
     if (id) {
         // Edição: não mexe no estoque
         await update(ref(db, 'produtos/' + id), produtoData);
-        alert('Produto atualizado com sucesso!');
+	window.mostrarAlertaSistema('Produto atualizado com sucesso!', 'Sucesso');
     } else {
         // Novo: define estoque inicial
         produtoData.estoque = estoqueInicial;
@@ -47,7 +47,8 @@ formProduto.addEventListener('submit', async (e) => {
         if (estoqueInicial > 0) {
             await registrarLogEstoque(novoProdRef.key, estoqueInicial, 'Entrada', 'Carga Inicial de Inventário');
         }
-        alert('Produto cadastrado com sucesso!');
+	window.mostrarAlertaSistema('Produto cadastrado com sucesso!', 'Sucesso');
+
     }
 
     resetarFormulario();
