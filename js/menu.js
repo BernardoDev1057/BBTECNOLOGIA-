@@ -1,8 +1,9 @@
 import { auth } from './firebase-config.js';
 import { signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { $, setText, setHTML } from './utils.js';
 
 export function renderizarMenuGlobal(paginaAtiva) {
-    const localMenu = document.getElementById('menu-global-container');
+    const localMenu = $('menu-global-container');
     if (!localMenu) return;
 
     localMenu.innerHTML = `
@@ -14,6 +15,7 @@ export function renderizarMenuGlobal(paginaAtiva) {
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'dashboard' ? 'active fw-bold text-primary' : ''}" href="dashboard.html">Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'clientes' ? 'active fw-bold text-primary' : ''}" href="clientes.html">Clientes</a></li>
+                    <li class="nav-item"><a class="nav-link ${paginaAtiva === 'vendas' ? 'active fw-bold text-primary' : ''}" href="vendas.html">Vendas</a></li>
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'produtos' ? 'active fw-bold text-primary' : ''}" href="produtos.html">Produtos</a></li>
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'caixa' ? 'active fw-bold text-primary' : ''}" href="caixa.html">Frente de Caixa (PDV)</a></li>
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'contas' ? 'active fw-bold text-primary' : ''}" href="contas.html">Contas a Receber</a></li>
@@ -60,15 +62,15 @@ export function renderizarMenuGlobal(paginaAtiva) {
     const bModalConfirm = new bootstrap.Modal(document.getElementById('modal-confirm-sistema'));
 
     window.mostrarAlertaSistema = (mensagem, titulo = "Aviso do Sistema") => {
-        document.getElementById('modal-alerta-titulo').textContent = titulo;
-        document.getElementById('modal-alerta-corpo').innerHTML = mensagem;
+        setText('modal-alerta-titulo', titulo);
+        setHTML('modal-alerta-corpo', mensagem);
         bModalAlerta.show();
     };
 
     window.mostrarConfirmacaoSistema = (mensagem, callbackSim) => {
-        document.getElementById('modal-confirm-corpo').textContent = mensagem;
+        setText('modal-confirm-corpo', mensagem);
         
-        const btnSim = document.getElementById('modal-confirm-btn-sim');
+        const btnSim = $('modal-confirm-btn-sim');
         // Remove listeners antigos clonando o botão
         const novoBtnSim = btnSim.cloneNode(true);
         btnSim.parentNode.replaceChild(novoBtnSim, btnSim);
