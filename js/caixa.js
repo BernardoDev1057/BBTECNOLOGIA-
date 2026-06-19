@@ -1,5 +1,5 @@
 import { db, auth, ref, push, set, get, update } from './firebase-config.js';
-import { dispararMensagemWhatsApp } from './whatsapp.js'; // <-- Adicione esta linha no topo
+import { dispararMensagemWhatsApp } from './whatsapp.js';
 import { imprimirComprovante } from './impressora.js';
 
 // Estados de Controle Globais do Turno
@@ -41,46 +41,43 @@ async function verificarFluxoCaixa() {
     }
 
     if (caixaAberto) {
-        // Redirecionamento Visual Direto para o PDV
         telaAbertura.style.display = 'none';
         telaPdv.style.display = 'grid';
         navBtnSangria.style.display = 'inline-block';
         navBtnFechar.style.display = 'inline-block';
-       if (window.toggleBarraCaixa) window.toggleBarraCaixa(true);
-       carregarDadosParaBusca();
+        if (window.toggleBarraCaixa) window.toggleBarraCaixa(true);
+        carregarDadosParaBusca();
     } else {
-        // Trava de tela: Exige a abertura
         telaAbertura.style.display = 'block';
         telaPdv.style.display = 'none';
         navBtnSangria.style.display = 'none';
         navBtnFechar.style.display = 'none';
-	if (window.toggleBarraCaixa) window.toggleBarraCaixa(false);
+        if (window.toggleBarraCaixa) window.toggleBarraCaixa(false);
     }
 }
 
 // Botão: Abrir Turno
 document.getElementById('btn-confirmar-abertura').addEventListener('click', async () => {
     const troco = parseFloat(document.getElementById('caixa-troco-inicial').value) || 0;
-    
+
     await set(push(ref(db, 'caixas')), {
         operador: auth.currentUser.email,
         dataHoraAbertura: new Date().toISOString(),
         valorInicial: troco,
         status: 'Aberto'
     });
-   imprimirComprovante("ABERTURA DE CAIXA", `<p>Operador: ${auth.currentUser.email}</p>`);
+    imprimirComprovante("ABERTURA DE CAIXA", `<p>Operador: ${auth.currentUser.email}</p>`);
     alert("Caixa iniciado com sucesso! Boas vendas.");
     verificarFluxoCaixa();
 });
 
 // Modais - Controle de Exibição
-navBtnSangria.addEventListener('click', () => document.getElementById('modal-sangria').style.display = 'flex');
+navBtnSangria.addEventListener('click', () => window.modalSangria.show());
 navBtnFechar.addEventListener('click', async () => {
-    document.getElementById('modal-fechamento').style.display = 'flex';
-    
-    // Calcula em tempo real o valor estimado esperado
+    window.modalFechamento.show();
+
     let totalSuprimentos = 0, totalSangrias = 0, totalDinheiroVendas = 0;
-    
+
     const sup = await get(ref(db, 'suprimentos'));
     if(sup.exists()) Object.values(sup.val()).forEach(s => { if(s.caixaId === caixaAtivoId) totalSuprimentos += s.valor; });
 
@@ -99,9 +96,9 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
     const valor = parseFloat(document.getElementById('modal-mov-valor').value);
     const justificativa = document.getElementById('modal-mov-justificativa').value;
 
-    if(isNaN(valor) || !justificativa) return alert("Preencha todos os campos da movimentação!");
+    if(isNaN(valor) ||!justificativa) return alert("Preencha todos os campos da movimentação!");
 
-    const destino = tipo === 'Suprimento' ? 'suprimentos' : 'sangrias';
+    const destino = tipo === 'Suprimento'? 'suprimentos' : 'sangrias';
     await set(push(ref(db, destino)), {
         caixaId: caixaAtivoId,
         valor,
@@ -109,7 +106,7 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
         usuario: auth.currentUser.email,
         dataHora: new Date().toISOString()
     });
-   // --- NOVA MENSAGEM E IMPRESSÃO DE MOVIMENTAÇÃO ---
+
     const corpoMov = `
         <div style="font-size: 14px;">
             <p><strong>Tipo:</strong> ${tipo}</p>
@@ -118,11 +115,13 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
             <p><strong>Operador:</strong> ${auth.currentUser.email}</p>
         </div>
     `;
-    
-    // Dispara a impressão automática
     imprimirComprovante(`COMPROVANTE DE ${tipo.toUpperCase()}`, corpoMov);
     alert(`${tipo} lançado com sucesso!`);
-    window.fecharModais();
+
+    // CORREÇÃO: fecha modal Bootstrap 5 corretamente
+    window.modalSangria.hide();
+    document.getElementById('modal-mov-valor').value = '';
+    document.getElementById('modal-mov-justificativa').value = '';
 });
 
 // Confirmar Encerramento de Caixa
@@ -134,7 +133,6 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
     const diferenca = valorContado - valorEsperado;
     const dataFechamento = new Date().toISOString();
 
-    // 1. Grava no Firebase
     await update(ref(db, `caixas/${caixaAtivoId}`), {
         status: 'Fechado',
         dataHoraFechamento: dataFechamento,
@@ -144,7 +142,6 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
         justificativaDiferenca: document.getElementById('caixa-justificativa-dif').value || ""
     });
 
-    // 2. Monta o Relatório para Impressão
     const corpoRelatorio = `
         <div style="font-size: 13px;">
             <p><strong>Relatório de Fechamento</strong></p>
@@ -157,13 +154,12 @@ document.getElementById('btn-confirmar-fechamento').addEventListener('click', as
             <p><strong>Obs:</strong> ${document.getElementById('caixa-justificativa-dif').value || 'Nenhuma'}</p>
         </div>
     `;
-
-    // 3. Imprime
     imprimirComprovante("FECHAMENTO DE CAIXA", corpoRelatorio);
-
     alert("Turno encerrado e relatório impresso!");
-    
-    // Pequeno delay para garantir que a impressão carregue antes de recarregar a página
+
+    // CORREÇÃO: fecha modal antes de reload
+    window.modalFechamento.hide();
+
     setTimeout(() => {
         window.location.reload();
     }, 1000);
@@ -180,7 +176,7 @@ async function carregarDadosParaBusca() {
     if(cliSnap.exists()) listaClientesMemoria = cliSnap.val();
 }
 
-// Input de busca de produtos (Filtra por nome ou código)
+// Busca de produtos
 document.getElementById('pdv-busca-produto').addEventListener('input', (e) => {
     const termo = e.target.value.toLowerCase().trim();
     const divResultados = document.getElementById('lista-busca-produto');
@@ -191,7 +187,7 @@ document.getElementById('pdv-busca-produto').addEventListener('input', (e) => {
     let filtrados = 0;
     Object.entries(listaProdutosMemoria).forEach(([id, p]) => {
         if (p.descricao.toLowerCase().includes(termo) || p.codigoBarras.includes(termo)) {
-            if(filtrados++ > 5) return; // Limita visualização para velocidade
+            if(filtrados++ > 5) return;
             const item = document.createElement('div');
             item.className = 'busca-item';
             item.textContent = `${p.codigoBarras} - ${p.descricao} (Estoque: ${p.estoque})`;
@@ -204,10 +200,10 @@ document.getElementById('pdv-busca-produto').addEventListener('input', (e) => {
         }
     });
 
-    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
+    divResultados.style.display = filtrados > 0? 'block' : 'none';
 });
 
-// Input de busca de clientes
+// Busca de clientes
 document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
     const termo = e.target.value.toLowerCase().trim();
     const divResultados = document.getElementById('lista-busca-cliente');
@@ -217,7 +213,7 @@ document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
 
     let filtrados = 0;
     Object.entries(listaClientesMemoria).forEach(([id, c]) => {
-        const doc = c.documento || "";
+        const doc = c.cpf || "";
         if (c.nome.toLowerCase().includes(termo) || doc.includes(termo)) {
             if(filtrados++ > 5) return;
             const item = document.createElement('div');
@@ -231,9 +227,8 @@ document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
             divResultados.appendChild(item);
         }
     });
-    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
+    divResultados.style.display = filtrados > 0? 'block' : 'none';
 });
-
 
 // ==========================================
 // 3. MOTOR DO CARRINHO E VENDA (PDV)
@@ -241,11 +236,9 @@ document.getElementById('pdv-busca-cliente').addEventListener('input', (e) => {
 document.getElementById('btn-adicionar-item').addEventListener('click', () => {
     const qtd = parseFloat(document.getElementById('pdv-qtd').value) || 1;
 
-    // Se o operador usou a caixa de busca e clicou no produto
     if (produtoSelecionadoId && listaProdutosMemoria[produtoSelecionadoId]) {
         inserirNoCarrinho(produtoSelecionadoId, listaProdutosMemoria[produtoSelecionadoId], qtd);
     } else {
-        // Se ele apenas bipou o código direto no input e apertou o botão sem selecionar na lista
         const textoInput = document.getElementById('pdv-busca-produto').value.trim();
         let achadoId = null;
         Object.entries(listaProdutosMemoria).forEach(([id, p]) => {
@@ -262,10 +255,10 @@ document.getElementById('btn-adicionar-item').addEventListener('click', () => {
 
 function inserirNoCarrinho(id, itemDados, qtd) {
     let precoAplicado = itemDados.valorVenda;
-    
-    // Regra Automática de Venda por Atacado
-    if(itemDados.quantidadeMinimaAtacado && qtd >= itemDados.quantidadeMinimaAtacado) {
-        precoAplicado = itemDados.precoAtacado || itemDados.valorVenda;
+
+    // REGRA ATACADO - PADRÃO ÚNICO: precoAtacado / quantidadeMinimaAtacado
+    if(itemDados.quantidadeMinimaAtacado && qtd >= itemDados.quantidadeMinimaAtacado && itemDados.precoAtacado > 0) {
+        precoAplicado = itemDados.precoAtacado;
     }
 
     carrinho.push({
@@ -276,7 +269,6 @@ function inserirNoCarrinho(id, itemDados, qtd) {
         subtotal: precoAplicado * qtd
     });
 
-    // Reset dos campos de entrada
     document.getElementById('pdv-busca-produto').value = '';
     document.getElementById('pdv-qtd').value = 1;
     produtoSelecionadoId = null;
@@ -298,7 +290,7 @@ function renderizarCarrinhoHTML() {
             <td>${item.quantidade}</td>
             <td>R$ ${item.precoUnitario.toFixed(2)}</td>
             <td>R$ ${item.subtotal.toFixed(2)}</td>
-            <td><button class="btn-danger" style="padding:2px 8px;" onclick="window.removerItemCarrinho(${index})">X</button></td>
+            <td><button class="btn btn-sm btn-danger" onclick="window.removerItemCarrinho(${index})">X</button></td>
         `;
         tbody.appendChild(tr);
     });
@@ -306,7 +298,6 @@ function renderizarCarrinhoHTML() {
     document.getElementById('pdv-total-venda').textContent = totalVendaGlobal.toFixed(2);
 }
 
-// Exposto globalmente para o botão remover funcionar
 window.removerItemCarrinho = (index) => {
     carrinho.splice(index, 1);
     renderizarCarrinhoHTML();
@@ -315,13 +306,14 @@ window.removerItemCarrinho = (index) => {
 // Fechamento de Cupom
 document.getElementById('btn-finalizar-venda').addEventListener('click', async () => {
     if(carrinho.length === 0) return alert("Carrinho vazio!");
-    
+
     const clienteId = document.getElementById('pdv-cliente-id-selecionado').value;
     const formaPagamento = document.getElementById('pdv-forma-pagamento').value;
 
+    // Fiado: valida limite e cria conta a receber
     if (formaPagamento === 'CREDITO_LOJA') {
         if(!clienteId) return alert("Venda fiada rejeitada: Selecione um cliente!");
-        
+
         const cliSnap = await get(ref(db, `clientes/${clienteId}`));
         const cli = cliSnap.val();
         const dividaFinal = (cli.saldoDevedor || 0) + totalVendaGlobal;
@@ -336,7 +328,7 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         });
     }
 
-    // Abate o estoque no Firebase
+    // Abate o estoque
     for (let item of carrinho) {
         const pSnap = await get(ref(db, `produtos/${item.id}`));
         if(pSnap.exists()) {
@@ -344,17 +336,18 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         }
     }
 
-    // Grava a Venda
+    // GRAVA VENDA - AGORA SEMPRE COM clienteId
     await set(push(ref(db, 'vendas')), {
         caixaId: caixaAtivoId,
         operador: auth.currentUser.email,
+        clienteId: clienteId || null,
         items: carrinho,
         total: totalVendaGlobal,
         formaPagamento,
         dataHora: new Date().toISOString()
     });
-//IMPRESSAO DO CUPOM
-// 2. Monta o corpo do Cupom para Impressão
+
+    // Impressão do Cupom
     let itensHtml = carrinho.map(item => `
         <div style="display: flex; justify-content: space-between;">
             <span>${item.quantidade}x ${item.descricao}</span>
@@ -373,50 +366,36 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             <p><strong>Forma de Pagto:</strong> ${formaPagamento}</p>
         </div>
     `;
-
-    // 3. Chama a função de impressão que você criou
     imprimirComprovante("CUPOM FISCAL", corpoCupom);
 
-
-// --- NOVA FUNCIONALIDADE: DISPARO DO CUPOM VIA WHATSAPP ---
+    // WhatsApp pro cliente se selecionado
     if (clienteId && listaClientesMemoria[clienteId]) {
         const dadosCliente = listaClientesMemoria[clienteId];
-        
         const querEnviar = confirm(`Venda salva! Deseja enviar o Cupom Digital para o WhatsApp de ${dadosCliente.nome}?`);
-        
+
         if (querEnviar) {
-            // Monta o corpo de texto do cupom formatado de forma legível
-            let cupomTexto = `🛍️ *CUPOM FISCAL DIGITAL - Distribuidora*\n`;
+            let cupomTexto = `🛍️ *CUPOM FISCAL DIGITAL*\n`;
             cupomTexto += `----------------------------------------\n`;
             cupomTexto += `📅 Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}\n`;
             cupomTexto += `👤 Cliente: ${dadosCliente.nome}\n`;
-            cupomTexto += `💳 Pagamento: ${formaPagamento}\n`;
             cupomTexto += `----------------------------------------\n`;
-            cupomTexto += `*ITENS DO PEDIDO:*\n`;
-            
-            carrinho.forEach((item, index) => {
-                cupomTexto += `${index + 1}. ${item.descricao} x${item.quantidade} - R$ ${item.subtotal.toFixed(2)}\n`;
+            carrinho.forEach(item => {
+                cupomTexto += `${item.quantidade}x ${item.descricao} - R$ ${item.subtotal.toFixed(2)}\n`;
             });
-            
             cupomTexto += `----------------------------------------\n`;
-            cupomTexto += `💰 *TOTAL A PAGAR: R$ ${totalVendaGlobal.toFixed(2)}*\n\n`;
-            cupomTexto += `Obrigado pela preferência! Volte sempre. 😊`;
+            cupomTexto += `💰 TOTAL: R$ ${totalVendaGlobal.toFixed(2)}\n`;
+            cupomTexto += `💳 Pagamento: ${formaPagamento}\n\nObrigado pela preferência!`;
 
-            // Chama o motor de envio
             dispararMensagemWhatsApp(dadosCliente.telefone, cupomTexto);
         }
-    } else {
-        alert("Venda concluída com sucesso (Consumidor não identificado)!");
     }
 
-
+    // Reset carrinho
     carrinho = [];
-    document.getElementById('pdv-busca-cliente').value = '';
     document.getElementById('pdv-cliente-id-selecionado').value = '';
+    document.getElementById('pdv-busca-cliente').value = '';
     renderizarCarrinhoHTML();
-    carregarDadosParaBusca(); // Atualiza saldos em cache
+    alert("Venda finalizada com sucesso!");
 });
 
-// Disparo Inicial por Pooling seguro do Firebase Auth
-setTimeout(verificarFluxoCaixa, 1500);
-
+verificarFluxoCaixa();

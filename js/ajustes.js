@@ -6,92 +6,110 @@ let produtosCache = {};
 
 async function carregarAjustes() {
     const snap = await get(ref(db, 'produtos'));
-    if (!snap.exists()) {
-        tabela.innerHTML = '<tr><td colspan="6" class="text-center">Nenhum produto encontrado.</td></tr>';
-        return;
-    }
-    produtosCache = snap.val();
-    renderizarTabela(produtosCache);
-}
+        if (!snap.exists()) {
+                tabela.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum produto encontrado.</td></tr>';
+                        return;
+                            }
+                                produtosCache = snap.val();
+                                    renderizarTabela(produtosCache);
+                                    }
 
-function calcularMargem(custo, venda) {
-    return venda > 0? ((venda - custo) / venda) * 100 : 0;
-}
+                                    function calcularMargem(custo, venda) {
+                                        return venda > 0? ((venda - custo) / venda) * 100 : 0;
+                                        }
 
-function corMargem(margem) {
-    if (margem >= 30) return 'bg-success';
-    if (margem >= 20) return 'bg-warning text-dark';
-    return 'bg-danger';
-}
+                                        function corMargem(margem) {
+                                            if (margem >= 30) return 'bg-success';
+                                                if (margem >= 20) return 'bg-warning text-dark';
+                                                    return 'bg-danger';
+                                                    }
 
-function renderizarTabela(produtos) {
-    tabela.innerHTML = '';
-    Object.entries(produtos).forEach(([id, p]) => {
-        const custo = p.valorCusto || 0;
-        const venda = p.valorVenda || 0;
-        const margem = calcularMargem(custo, venda);
+                                                    function renderizarTabela(produtos) {
+                                                        tabela.innerHTML = '';
+                                                            Object.entries(produtos).forEach(([id, p]) => {
+                                                                    const custo = p.valorCusto || 0;
+                                                                            const venda = p.valorVenda || 0;
+                                                                                    const atacado = p.precoAtacado || 0;
+                                                                                            const qtdMin = p.quantidadeMinimaAtacado || 0;
+                                                                                                    const margem = calcularMargem(custo, venda);
+                                                                                                            const descricao = p.descricao || '';
+                                                                                                                    const codigo = p.codigoBarras || '';
 
-        const tr = document.createElement('tr');
-        tr.dataset.id = id;
-        tr.innerHTML = `
-            <td>${p.descricao}<br><small class="text-muted">${p.codigoBarras}</small></td>
-            <td><input type="number" step="0.01" class="form-control form-control-sm edit-custo" value="${custo.toFixed(2)}" style="width: 100px;"></td>
-            <td><input type="number" step="0.01" class="form-control form-control-sm edit-venda" value="${venda.toFixed(2)}" style="width: 100px;"></td>
-            <td><span class="badge ${corMargem(margem)} margem-badge">${margem.toFixed(1)}%</span></td>
-            <td><button class="btn btn-sm btn-primary btn-salvar">Salvar</button></td>
-        `;
-        tabela.appendChild(tr);
-    });
-}
+                                                                                                                            const tr = document.createElement('tr');
+                                                                                                                                    tr.dataset.id = id;
+                                                                                                                                            // GUARDA DADOS PRA BUSCA - evita usar innerText
+                                                                                                                                                    tr.dataset.descricao = descricao.toLowerCase();
+                                                                                                                                                            tr.dataset.codigo = codigo.toLowerCase();
 
-// Calculo em tempo real
-tabela.addEventListener('input', (e) => {
-    if (e.target.classList.contains('edit-custo') || e.target.classList.contains('edit-venda')) {
-        const tr = e.target.closest('tr');
-        const custo = parseFloat(tr.querySelector('.edit-custo').value) || 0;
-        const venda = parseFloat(tr.querySelector('.edit-venda').value) || 0;
-        const margem = calcularMargem(custo, venda);
+                                                                                                                                                                    tr.innerHTML = `
+                                                                                                                                                                                <td>${descricao}<br><small class="text-muted">${codigo}</small></td>
+                                                                                                                                                                                            <td><input type="number" step="0.01" class="form-control form-control-sm edit-custo" value="${custo.toFixed(2)}" style="width: 100px;"></td>
+                                                                                                                                                                                                        <td><input type="number" step="0.01" class="form-control form-control-sm edit-venda" value="${venda.toFixed(2)}" style="width: 100px;"></td>
+                                                                                                                                                                                                                    <td><span class="badge ${corMargem(margem)} margem-badge">${margem.toFixed(1)}%</span></td>
+                                                                                                                                                                                                                                <td><input type="number" step="0.01" class="form-control form-control-sm edit-atacado" value="${atacado.toFixed(2)}" style="width: 100px;"></td>
+                                                                                                                                                                                                                                            <td><input type="number" step="1" min="0" class="form-control form-control-sm edit-qtd-min" value="${qtdMin}" style="width: 80px;"></td>
+                                                                                                                                                                                                                                                        <td><button class="btn btn-sm btn-primary btn-salvar">Salvar</button></td>
+                                                                                                                                                                                                                                                                `;
+                                                                                                                                                                                                                                                                        tabela.appendChild(tr);
+                                                                                                                                                                                                                                                                            });
+                                                                                                                                                                                                                                                                            }
 
-        const badge = tr.querySelector('.margem-badge');
-        badge.textContent = margem.toFixed(1) + '%';
-        badge.className = 'badge margem-badge ' + corMargem(margem);
-    }
-});
+                                                                                                                                                                                                                                                                            // Calculo em tempo real da margem
+                                                                                                                                                                                                                                                                            tabela.addEventListener('input', (e) => {
+                                                                                                                                                                                                                                                                                if (e.target.classList.contains('edit-custo') || e.target.classList.contains('edit-venda')) {
+                                                                                                                                                                                                                                                                                        const tr = e.target.closest('tr');
+                                                                                                                                                                                                                                                                                                const custo = parseFloat(tr.querySelector('.edit-custo').value) || 0;
+                                                                                                                                                                                                                                                                                                        const venda = parseFloat(tr.querySelector('.edit-venda').value) || 0;
+                                                                                                                                                                                                                                                                                                                const margem = calcularMargem(custo, venda);
 
-// Salvar no Firebase
-tabela.addEventListener('click', async (e) => {
-    if (e.target.classList.contains('btn-salvar')) {
-        const tr = e.target.closest('tr');
-        const id = tr.dataset.id;
-        const novoCusto = parseFloat(tr.querySelector('.edit-custo').value);
-        const novoPreco = parseFloat(tr.querySelector('.edit-venda').value);
+                                                                                                                                                                                                                                                                                                                        const badge = tr.querySelector('.margem-badge');
+                                                                                                                                                                                                                                                                                                                                badge.textContent = margem.toFixed(1) + '%';
+                                                                                                                                                                                                                                                                                                                                        badge.className = 'badge margem-badge ' + corMargem(margem);
+                                                                                                                                                                                                                                                                                                                                            }
+                                                                                                                                                                                                                                                                                                                                            });
 
-        if (confirm("Confirmar alteração de custo e preço?")) {
-            await update(ref(db, `produtos/${id}`), {
-                valorCusto: novoCusto,
-                valorVenda: novoPreco
-            });
-            alert("Dados atualizados!");
-            produtosCache[id].valorCusto = novoCusto;
-            produtosCache[id].valorVenda = novoPreco;
-        }
-    }
-});
+                                                                                                                                                                                                                                                                                                                                            // Salvar no Firebase com padrão único
+                                                                                                                                                                                                                                                                                                                                            tabela.addEventListener('click', async (e) => {
+                                                                                                                                                                                                                                                                                                                                                if (e.target.classList.contains('btn-salvar')) {
+                                                                                                                                                                                                                                                                                                                                                        const tr = e.target.closest('tr');
+                                                                                                                                                                                                                                                                                                                                                                const id = tr.dataset.id;
+                                                                                                                                                                                                                                                                                                                                                                        const novoCusto = parseFloat(tr.querySelector('.edit-custo').value) || 0;
+                                                                                                                                                                                                                                                                                                                                                                                const novoPreco = parseFloat(tr.querySelector('.edit-venda').value) || 0;
+                                                                                                                                                                                                                                                                                                                                                                                        const novoAtacado = parseFloat(tr.querySelector('.edit-atacado').value) || 0;
+                                                                                                                                                                                                                                                                                                                                                                                                const novaQtdMin = parseInt(tr.querySelector('.edit-qtd-min').value) || 0;
 
-// Busca só depois de 3 caracteres
-inputBusca.addEventListener('input', (e) => {
-    const termo = e.target.value.toLowerCase().trim();
-    const linhas = tabela.querySelectorAll('tr');
+                                                                                                                                                                                                                                                                                                                                                                                                        if (confirm("Confirmar alteração de custo, preço e atacado?")) {
+                                                                                                                                                                                                                                                                                                                                                                                                                    await update(ref(db, `produtos/${id}`), {
+                                                                                                                                                                                                                                                                                                                                                                                                                                    valorCusto: novoCusto,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                    valorVenda: novoPreco,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                    precoAtacado: novoAtacado,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    quantidadeMinimaAtacado: novaQtdMin
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            alert("Dados atualizados!");
 
-    if (termo.length < 3 && termo.length > 0) return;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        produtosCache[id].valorCusto = novoCusto;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    produtosCache[id].valorVenda = novoPreco;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                produtosCache[id].precoAtacado = novoAtacado;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            produtosCache[id].quantidadeMinimaAtacado = novaQtdMin;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        });
 
-    linhas.forEach(tr => {
-        if (termo.length === 0) {
-            tr.style.display = '';
-        } else {
-            tr.style.display = tr.innerText.toLowerCase().includes(termo)? '' : 'none';
-        }
-    });
-});
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // FILTRO CORRIGIDO - busca por dataset, ativa a partir de 1 caractere
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        inputBusca.addEventListener('input', (e) => {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const termo = e.target.value.toLowerCase().trim();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                const linhas = tabela.querySelectorAll('tr');
 
-carregarAjustes();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    linhas.forEach(tr => {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            if (termo.length === 0) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        tr.style.display = '';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                } else {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const desc = tr.dataset.descricao || '';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        const cod = tr.dataset.codigo || '';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // Busca em descrição OU código
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                tr.style.display = (desc.includes(termo) || cod.includes(termo))? '' : 'none';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            });
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            carregarAjustes();

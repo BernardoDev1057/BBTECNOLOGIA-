@@ -16,7 +16,7 @@ export function imprimirComprovante(titulo, corpo) {
         ${corpo}
         <div class="linha"></div>
         <p style="text-align:center">Data: ${new Date().toLocaleString()}</p>
-        <script>window.print();setTimeout(() => { window.close(); }, 500);</script>
+        <script>window.print();setTimeout(() => { window.close(); }, 2000);</script>
         </body></html>
     `);
     janela.document.close();
