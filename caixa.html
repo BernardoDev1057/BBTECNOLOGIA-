@@ -76,12 +76,13 @@
                         </div>
                         <div class="mb-4">
                             <label class="form-label small fw-bold">Meio de Pagamento</label>
-                            <select id="pdv-forma-pagamento" class="form-select form-select-lg">
-                                <option value="Dinheiro">Dinheiro</option>
-                                <option value="PIX">PIX</option>
-                                <option value="Cartão">Cartão</option>
-                                <option value="CREDITO_LOJA">Crédito Loja (Fiado)</option>
-                            </select>
+<select id="pdv-forma-pagamento" class="form-select form-select-lg">
+    <option value="DINHEIRO">Dinheiro</option>
+    <option value="PIX">PIX</option>
+    <option value="DEBITO">Débito</option>
+    <option value="CREDITO">Crédito</option>
+    <option value="CREDITO_LOJA">Crédito Loja (Fiado)</option>
+</select>
                         </div>
                         <button class="btn btn-success btn-lg w-100 fw-bold py-3 shadow" id="btn-finalizar-venda">Concluir Venda (F10)</button>
                     </div>
@@ -127,10 +128,6 @@
     // Inicializa os modais do Bootstrap apenas uma vez
     window.modalSangria = new bootstrap.Modal(document.getElementById('modal-sangria'));
     window.modalFechamento = new bootstrap.Modal(document.getElementById('modal-fechamento'));
-
-    // Configura os cliques dos botões da barra superior
-    document.getElementById('nav-btn-sangria').addEventListener('click', () => window.modalSangria.show());
-    document.getElementById('nav-btn-fechar').addEventListener('click', () => window.modalFechamento.show());
 
     // Função para ser chamada pelo caixa.js para mostrar/esconder a barra
     window.toggleBarraCaixa = (mostrar) => {

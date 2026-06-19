@@ -224,7 +224,6 @@ async function enviarMensagemCobranca(id) {
 
         const textoMensagem = `Sr(a). ${nome},\n\n` +
             `📌 *Saldo em aberto:* R$ ${saldoDevedor.toFixed(2)}\n` +
-            `📈 *Limite disponível:* R$ ${limiteDisponivel.toFixed(2)}\n\n` +
             `Para liquidação imediata via PIX ou pagamento em espécie, responda esta mensagem. Nossa equipe realizará a baixa na sua conta com total discrição.\n\n` +
             `Atenciosamente,`;
 

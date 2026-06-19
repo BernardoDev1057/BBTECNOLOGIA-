@@ -25,7 +25,7 @@ document.getElementById('contas-busca-cliente').addEventListener('input', (e) =>
     let filtrados = 0;
     Object.entries(listaClientesMemoria).forEach(([id, c]) => {
         if (c.nome.toLowerCase().includes(termo)) {
-            if (filtrados++ > 5) return;
+            if (filtrados++ >= 5) return;
             const item = document.createElement('div');
             item.className = 'busca-item';
             item.textContent = `${c.nome} - Dívida Total: R$ ${(c.saldoDevedor || 0).toFixed(2)}`;
@@ -39,7 +39,7 @@ document.getElementById('contas-busca-cliente').addEventListener('input', (e) =>
             divResultados.appendChild(item);
         }
     });
-    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
+    divResultados.style.display = filtrados > 0? 'block' : 'none';
 });
 
 // Esconde busca ao clicar fora
@@ -69,9 +69,8 @@ async function carregarHistoricoTitulos(clienteId) {
         let titulosEncontrados = [];
         Object.entries(recSnap.val()).forEach(([id, r]) => {
             if (r.clienteId === clienteId) {
-                // Se não mostrar cancelados, filtra eles
                 if (!mostrarCancelados && r.cancelado) return;
-                titulosEncontrados.push({ id, ...r });
+                titulosEncontrados.push({ id,...r });
             }
         });
 
@@ -85,7 +84,6 @@ async function carregarHistoricoTitulos(clienteId) {
         titulosEncontrados.forEach(t => {
             const tr = document.createElement('tr');
 
-            // Se for cancelado, deixa a linha apagada
             if (t.cancelado) tr.classList.add('table-secondary');
 
             let txtStatus = '';
@@ -97,12 +95,12 @@ async function carregarHistoricoTitulos(clienteId) {
                 txtStatus = `<span class="badge bg-warning text-dark">⚠️ Em Aberto</span>`;
             }
 
-            const dataPagamento = t.dataPagamento ? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
+            const dataPagamento = t.dataPagamento? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
 
             let botaoAcao = '';
-            if (t.status === 'Aberto' && !t.cancelado) {
+            if (t.status === 'Aberto' &&!t.cancelado) {
                 botaoAcao = `<button class="btn btn-sm btn-success" onclick="window.quitarTitulo('${t.id}', ${t.valor}, '${clienteId}')">Baixar</button>`;
-            } else if (t.status === 'Pago' && !t.cancelado) {
+            } else if (t.status === 'Pago' &&!t.cancelado) {
                 botaoAcao = `
                     <button class="btn btn-sm btn-outline-primary" onclick="window.gerarComprovante('${t.id}')">Comprovante</button>
                     <button class="btn btn-sm btn-outline-danger" onclick="window.estornarBaixa('${t.id}', ${t.valor}, '${clienteId}')">Estornar</button>
@@ -123,41 +121,143 @@ async function carregarHistoricoTitulos(clienteId) {
     }
 }
 
-// BAIXA - NÃO AFETA CAIXA
-window.quitarTitulo = async (tituloId, valor, clienteId) => {
+// BAIXA PARCIAL + FORMA DE PAGAMENTO
+window.quitarTitulo = async (tituloId, valorTotal, clienteId) => {
     const cliente = listaClientesMemoria[clienteId];
-    
-    window.mostrarConfirmacaoSistema(`Confirmar baixa de R$ ${valor.toFixed(2)} para ${cliente.nome}?`, async () => {
-        const dataPagamento = new Date().toISOString();
-        const usuario = auth.currentUser.email;
-        const saldoAnterior = cliente.saldoDevedor || 0;
-        const novoSaldo = Math.max(0, saldoAnterior - valor);
 
-        // 1. Marca título como Pago
-        await update(ref(db, `contasReceber/${tituloId}`), {
-            status: 'Pago',
-            dataPagamento: dataPagamento,
-            cancelado: false,
-            usuarioBaixa: usuario
-        });
+    // Cria modal dinâmico se não existir
+    let modal = document.getElementById('modal-baixa');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-baixa';
+        modal.className = 'modal fade';
+        modal.tabIndex = -1;
+        modal.innerHTML = `
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Baixa de Título</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <p>Cliente: <b id="modal-cliente-nome"></b></p>
+              <p>Valor do título: <b id="modal-valor-titulo"></b></p>
+              <p>Saldo devedor: <b id="modal-saldo-cliente"></b></p>
+
+              <div class="mb-3">
+                <label class="form-label">Valor a pagar</label>
+                <input type="number" id="valor-baixa" class="form-control" step="0.01" min="0.01">
+                <small class="text-muted" id="modal-max-valor"></small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Forma de Pagamento</label>
+                <select id="forma-pagamento" class="form-select">
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="PIX">PIX</option>
+                  <option value="CARTAO_DEBITO">Cartão Débito</option>
+                  <option value="CARTAO_CREDITO">Cartão Crédito</option>
+                  <option value="CREDITO_LOJA">Crédito Loja</option>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Observação</label>
+                <input type="text" id="obs-baixa" class="form-control" placeholder="Opcional">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-success" id="btn-confirmar-baixa">Confirmar Baixa</button>
+            </div>
+          </div>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+
+    // Preenche dados do modal
+    document.getElementById('modal-cliente-nome').textContent = cliente.nome;
+    document.getElementById('modal-valor-titulo').textContent = `R$ ${valorTotal.toFixed(2)}`;
+    document.getElementById('modal-saldo-cliente').textContent = `R$ ${(cliente.saldoDevedor || 0).toFixed(2)}`;
+    document.getElementById('valor-baixa').max = valorTotal;
+    document.getElementById('valor-baixa').value = valorTotal.toFixed(2);
+    document.getElementById('modal-max-valor').textContent = `Máximo: R$ ${valorTotal.toFixed(2)}`;
+
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+
+    document.getElementById('btn-confirmar-baixa').onclick = async () => {
+        const valorPago = parseFloat(document.getElementById('valor-baixa').value);
+        const formaPg = document.getElementById('forma-pagamento').value;
+        const obs = document.getElementById('obs-baixa').value.trim();
+        const usuario = auth.currentUser.email;
+
+        if (isNaN(valorPago) || valorPago <= 0) {
+            window.mostrarAlertaSistema("Valor inválido", "Erro");
+            return;
+        }
+        if (valorPago > valorTotal + 0.01) {
+            window.mostrarAlertaSistema("Valor maior que o título", "Erro");
+            return;
+        }
+
+        bsModal.hide();
+
+        const dataPagamento = new Date().toISOString();
+        const saldoAnterior = cliente.saldoDevedor || 0;
+        const novoSaldo = Math.max(0, saldoAnterior - valorPago);
+        const saldoRestanteTitulo = valorTotal - valorPago;
+
+        // 1. Se pagou tudo: marca como Pago. Se parcial: reduz valor e cria registro de pagamento
+        if (saldoRestanteTitulo <= 0.01) {
+            await update(ref(db, `contasReceber/${tituloId}`), {
+                status: 'Pago',
+                dataPagamento: dataPagamento,
+                valorPago: valorPago,
+                formaPagamento: formaPg,
+                observacao: obs,
+                usuarioBaixa: usuario
+            });
+        } else {
+            // Baixa parcial: atualiza valor do título atual
+            await update(ref(db, `contasReceber/${tituloId}`), {
+                valor: parseFloat(saldoRestanteTitulo.toFixed(2)),
+                observacao: `Baixa parcial de R$ ${valorPago.toFixed(2)} via ${formaPg} em ${new Date().toLocaleDateString('pt-BR')}. ${obs}`
+            });
+
+            // Cria registro de pagamento para histórico
+            const novoPagamento = {
+                clienteId: clienteId,
+                clienteNome: cliente.nome,
+                dataLancamento: dataPagamento,
+                dataVencimento: (await get(ref(db, `contasReceber/${tituloId}/dataVencimento`))).val(),
+                status: 'Pago',
+                valor: valorPago,
+                valorPago: valorPago,
+                formaPagamento: formaPg,
+                observacao: `Baixa parcial do título ${tituloId}. ${obs}`,
+                dataPagamento: dataPagamento,
+                usuarioBaixa: usuario,
+                cancelado: false,
+                tituloOrigem: tituloId
+            };
+            await push(ref(db, 'contasReceber'), novoPagamento);
+        }
 
         // 2. Atualiza saldo do cliente
-        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: novoSaldo });
+        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: parseFloat(novoSaldo.toFixed(2)) });
 
-        window.mostrarAlertaSistema("Baixa realizada com sucesso!", "Sucesso");
+        window.mostrarAlertaSistema(`Baixa de R$ ${valorPago.toFixed(2)} realizada!`, "Sucesso");
 
-        // 3. Gera comprovante
-        window.gerarComprovante(tituloId);
-
-        // 4. Envia WhatsApp
+        // 3. WhatsApp
         if (cliente.telefone) {
-            const msg = `Olá ${cliente.nome}!\n\nRecebemos o pagamento de R$ ${valor.toFixed(2)} referente ao seu débito.\nData: ${new Date(dataPagamento).toLocaleString('pt-BR')}\nSaldo devedor restante: R$ ${novoSaldo.toFixed(2)}\n\nObrigado pela preferência!`;
+            const msg = `Olá ${cliente.nome}!\n\nRecebemos R$ ${valorPago.toFixed(2)} via ${formaPg}.\nData: ${new Date(dataPagamento).toLocaleString('pt-BR')}\nSaldo devedor restante: R$ ${novoSaldo.toFixed(2)}\n\nObrigado pela preferência!`;
             dispararMensagemWhatsApp(cliente.telefone, msg);
         }
 
         await carregarClientesCache();
         carregarHistoricoTitulos(clienteId);
-    });
+    };
 };
 
 // SOFT DELETE / ESTORNO
@@ -169,13 +269,15 @@ window.estornarBaixa = async (tituloId, valor, clienteId) => {
         await update(ref(db, `contasReceber/${tituloId}`), {
             status: 'Aberto',
             dataPagamento: null,
+            valorPago: null,
+            formaPagamento: null,
             cancelado: true,
             motivoCancelamento: 'Estorno de baixa',
             usuarioEstorno: auth.currentUser.email,
             dataEstorno: new Date().toISOString()
         });
 
-        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: saldoAtual + valor });
+        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: parseFloat((saldoAtual + valor).toFixed(2)) });
 
         window.mostrarAlertaSistema("Baixa estornada com sucesso!", "Sucesso");
         await carregarClientesCache();
@@ -190,13 +292,18 @@ window.gerarComprovante = async (tituloId) => {
     const t = snap.val();
     const cliente = listaClientesMemoria[t.clienteId];
 
+    const formaPg = t.formaPagamento? t.formaPagamento.replace('_', ' ') : 'N/I';
+    const valorPago = t.valorPago || t.valor;
+
     const corpo = `
         <p>Cliente: ${cliente.nome}</p>
         <p>Data Lançamento: ${new Date(t.dataLancamento).toLocaleString('pt-BR')}</p>
         <p>Data Pagamento: ${new Date(t.dataPagamento).toLocaleString('pt-BR')}</p>
-        <p>Valor Pago: R$ ${t.valor.toFixed(2)}</p>
+        <p>Forma Pagamento: ${formaPg}</p>
+        <p>Valor Pago: R$ ${valorPago.toFixed(2)}</p>
         <p>Saldo Devedor Atual: R$ ${(cliente.saldoDevedor).toFixed(2)}</p>
         <p>Operador: ${t.usuarioBaixa}</p>
+        ${t.observacao? `<p>Obs: ${t.observacao}</p>` : ''}
     `;
 
     imprimirComprovante('Comprovante de Baixa - Crédito Loja', corpo);
@@ -206,4 +313,3 @@ window.gerarComprovante = async (tituloId) => {
 document.addEventListener('DOMContentLoaded', () => {
     carregarClientesCache();
 });
-
