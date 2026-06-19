@@ -1,6 +1,7 @@
 import { db, auth, ref, push, set, get, update } from './firebase-config.js';
+import { $, fmtMoney, parseFloatSafe, parseIntSafe } from './utils.js';
 
-const formProduto = document.getElementById('form-produto');
+const formProduto = $('form-produto');
 const btnCancelar = document.createElement('button');
 btnCancelar.type = 'button';
 btnCancelar.className = 'btn btn-secondary fw-bold ms-2';
@@ -21,17 +22,17 @@ let produtosCache = {};
 formProduto.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const id = document.getElementById('produto-id').value;
-    const estoqueInicial = parseFloat(document.getElementById('prod-estoque').value) || 0;
+    const id = $('produto-id').value;
+    const estoqueInicial = parseFloatSafe($('prod-estoque').value);
 
     // PADRÃO ÚNICO: precoAtacado e quantidadeMinimaAtacado
     const produtoData = {
-        codigoBarras: document.getElementById('prod-codigo').value.trim(),
-        descricao: document.getElementById('prod-descricao').value.trim(),
-        valorCusto: parseFloat(document.getElementById('prod-custo').value) || 0,
-        valorVenda: parseFloat(document.getElementById('prod-venda').value) || 0,
-        precoAtacado: parseFloat(document.getElementById('prod-preco-atacado').value) || 0,
-        quantidadeMinimaAtacado: parseInt(document.getElementById('prod-qtd-min-atacado').value) || 0
+        codigoBarras: $('prod-codigo').value.trim(),
+        descricao: $('prod-descricao').value.trim(),
+        valorCusto: parseFloatSafe($('prod-custo').value),
+        valorVenda: parseFloatSafe($('prod-venda').value),
+        precoAtacado: parseFloatSafe($('prod-preco-atacado').value),
+        quantidadeMinimaAtacado: parseIntSafe($('prod-qtd-min-atacado').value)
     };
 
     if (id) {
@@ -59,10 +60,10 @@ btnCancelar.addEventListener('click', resetarFormulario);
 
 function resetarFormulario() {
     formProduto.reset();
-    document.getElementById('produto-id').value = '';
-    document.getElementById('prod-estoque').disabled = false;
-    document.getElementById('label-estoque-inicial').style.display = 'block';
-    document.getElementById('prod-estoque').style.display = 'block';
+    $('produto-id').value = '';
+    $('prod-estoque').disabled = false;
+    $('label-estoque-inicial').style.display = 'block';
+    $('prod-estoque').style.display = 'block';
     btnCancelar.style.display = 'none';
     document.querySelector('button[type="submit"]').textContent = 'Gravar Produto';
 }

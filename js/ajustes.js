@@ -1,115 +1,134 @@
 import { db, ref, get, update } from './firebase-config.js';
+import { $, parseFloatSafe, parseIntSafe } from './utils.js';
 
-const tabela = document.getElementById('tabela-ajustes');
-const inputBusca = document.getElementById('busca-ajuste');
+const tabela = $('tabela-ajustes');
+const inputBusca = $('busca-ajuste');
 let produtosCache = {};
 
 async function carregarAjustes() {
     const snap = await get(ref(db, 'produtos'));
-        if (!snap.exists()) {
-                tabela.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum produto encontrado.</td></tr>';
-                        return;
-                            }
-                                produtosCache = snap.val();
-                                    renderizarTabela(produtosCache);
-                                    }
+    if (!snap.exists()) {
+        tabela.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum produto encontrado.</td></tr>';
+        return;
+    }
 
-                                    function calcularMargem(custo, venda) {
-                                        return venda > 0? ((venda - custo) / venda) * 100 : 0;
-                                        }
+    produtosCache = snap.val();
+    renderizarTabela(produtosCache);
+}
 
-                                        function corMargem(margem) {
-                                            if (margem >= 30) return 'bg-success';
-                                                if (margem >= 20) return 'bg-warning text-dark';
-                                                    return 'bg-danger';
-                                                    }
+function calcularMargem(custo, venda) {
+    return venda > 0 ? ((venda - custo) / venda) * 100 : 0;
+}
 
-                                                    function renderizarTabela(produtos) {
-                                                        tabela.innerHTML = '';
-                                                            Object.entries(produtos).forEach(([id, p]) => {
-                                                                    const custo = p.valorCusto || 0;
-                                                                            const venda = p.valorVenda || 0;
-                                                                                    const atacado = p.precoAtacado || 0;
-                                                                                            const qtdMin = p.quantidadeMinimaAtacado || 0;
-                                                                                                    const margem = calcularMargem(custo, venda);
-                                                                                                            const descricao = p.descricao || '';
-                                                                                                                    const codigo = p.codigoBarras || '';
+function corMargem(margem) {
+    if (margem >= 30) return 'bg-success';
+    if (margem >= 20) return 'bg-warning text-dark';
+    return 'bg-danger';
+}
 
-                                                                                                                            const tr = document.createElement('tr');
-                                                                                                                                    tr.dataset.id = id;
-                                                                                                                                            // GUARDA DADOS PRA BUSCA - evita usar innerText
-                                                                                                                                                    tr.dataset.descricao = descricao.toLowerCase();
-                                                                                                                                                            tr.dataset.codigo = codigo.toLowerCase();
+function gerarLinhaProduto(id, produto) {
+    const custo = produto.valorCusto || 0;
+    const venda = produto.valorVenda || 0;
+    const atacado = produto.precoAtacado || 0;
+    const qtdMin = produto.quantidadeMinimaAtacado || 0;
+    const margem = calcularMargem(custo, venda);
 
-                                                                                                                                                                    tr.innerHTML = `
-                                                                                                                                                                                <td>${descricao}<br><small class="text-muted">${codigo}</small></td>
-                                                                                                                                                                                            <td><input type="number" step="0.01" class="form-control form-control-sm edit-custo" value="${custo.toFixed(2)}" style="width: 100px;"></td>
-                                                                                                                                                                                                        <td><input type="number" step="0.01" class="form-control form-control-sm edit-venda" value="${venda.toFixed(2)}" style="width: 100px;"></td>
-                                                                                                                                                                                                                    <td><span class="badge ${corMargem(margem)} margem-badge">${margem.toFixed(1)}%</span></td>
-                                                                                                                                                                                                                                <td><input type="number" step="0.01" class="form-control form-control-sm edit-atacado" value="${atacado.toFixed(2)}" style="width: 100px;"></td>
-                                                                                                                                                                                                                                            <td><input type="number" step="1" min="0" class="form-control form-control-sm edit-qtd-min" value="${qtdMin}" style="width: 80px;"></td>
-                                                                                                                                                                                                                                                        <td><button class="btn btn-sm btn-primary btn-salvar">Salvar</button></td>
-                                                                                                                                                                                                                                                                `;
-                                                                                                                                                                                                                                                                        tabela.appendChild(tr);
-                                                                                                                                                                                                                                                                            });
-                                                                                                                                                                                                                                                                            }
+    const tr = document.createElement('tr');
+    tr.dataset.id = id;
+    tr.dataset.descricao = (produto.descricao || '').toLowerCase();
+    tr.dataset.codigo = (produto.codigoBarras || '').toLowerCase();
 
-                                                                                                                                                                                                                                                                            // Calculo em tempo real da margem
-                                                                                                                                                                                                                                                                            tabela.addEventListener('input', (e) => {
-                                                                                                                                                                                                                                                                                if (e.target.classList.contains('edit-custo') || e.target.classList.contains('edit-venda')) {
-                                                                                                                                                                                                                                                                                        const tr = e.target.closest('tr');
-                                                                                                                                                                                                                                                                                                const custo = parseFloat(tr.querySelector('.edit-custo').value) || 0;
-                                                                                                                                                                                                                                                                                                        const venda = parseFloat(tr.querySelector('.edit-venda').value) || 0;
-                                                                                                                                                                                                                                                                                                                const margem = calcularMargem(custo, venda);
+    tr.innerHTML = `
+        <td>${produto.descricao || ''}<br><small class="text-muted">${produto.codigoBarras || ''}</small></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm edit-custo" value="${custo.toFixed(2)}" style="width: 100px"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm edit-venda" value="${venda.toFixed(2)}" style="width: 100px"></td>
+        <td><span class="badge ${corMargem(margem)} margem-badge">${margem.toFixed(1)}%</span></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm edit-atacado" value="${atacado.toFixed(2)}" style="width: 100px"></td>
+        <td><input type="number" step="1" min="0" class="form-control form-control-sm edit-qtd-min" value="${qtdMin}" style="width: 80px"></td>
+        <td><button class="btn btn-sm btn-primary btn-salvar">Salvar</button></td>
+    `;
 
-                                                                                                                                                                                                                                                                                                                        const badge = tr.querySelector('.margem-badge');
-                                                                                                                                                                                                                                                                                                                                badge.textContent = margem.toFixed(1) + '%';
-                                                                                                                                                                                                                                                                                                                                        badge.className = 'badge margem-badge ' + corMargem(margem);
-                                                                                                                                                                                                                                                                                                                                            }
-                                                                                                                                                                                                                                                                                                                                            });
+    return tr;
+}
 
-                                                                                                                                                                                                                                                                                                                                            // Salvar no Firebase com padrão único
-                                                                                                                                                                                                                                                                                                                                            tabela.addEventListener('click', async (e) => {
-                                                                                                                                                                                                                                                                                                                                                if (e.target.classList.contains('btn-salvar')) {
-                                                                                                                                                                                                                                                                                                                                                        const tr = e.target.closest('tr');
-                                                                                                                                                                                                                                                                                                                                                                const id = tr.dataset.id;
-                                                                                                                                                                                                                                                                                                                                                                        const novoCusto = parseFloat(tr.querySelector('.edit-custo').value) || 0;
-                                                                                                                                                                                                                                                                                                                                                                                const novoPreco = parseFloat(tr.querySelector('.edit-venda').value) || 0;
-                                                                                                                                                                                                                                                                                                                                                                                        const novoAtacado = parseFloat(tr.querySelector('.edit-atacado').value) || 0;
-                                                                                                                                                                                                                                                                                                                                                                                                const novaQtdMin = parseInt(tr.querySelector('.edit-qtd-min').value) || 0;
+function renderizarTabela(produtos) {
+    tabela.innerHTML = '';
+    Object.entries(produtos).forEach(([id, p]) => {
+        tabela.appendChild(gerarLinhaProduto(id, p));
+    });
+}
 
-                                                                                                                                                                                                                                                                                                                                                                                                        if (confirm("Confirmar alteração de custo, preço e atacado?")) {
-                                                                                                                                                                                                                                                                                                                                                                                                                    await update(ref(db, `produtos/${id}`), {
-                                                                                                                                                                                                                                                                                                                                                                                                                                    valorCusto: novoCusto,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                    valorVenda: novoPreco,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                    precoAtacado: novoAtacado,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    quantidadeMinimaAtacado: novaQtdMin
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            alert("Dados atualizados!");
+function atualizarMargemLinha(tr) {
+    const custo = parseFloatSafe(tr.querySelector('.edit-custo').value);
+    const venda = parseFloatSafe(tr.querySelector('.edit-venda').value);
+    const margem = calcularMargem(custo, venda);
+    const badge = tr.querySelector('.margem-badge');
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        produtosCache[id].valorCusto = novoCusto;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    produtosCache[id].valorVenda = novoPreco;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                produtosCache[id].precoAtacado = novoAtacado;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            produtosCache[id].quantidadeMinimaAtacado = novaQtdMin;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        });
+    if (badge) {
+        badge.textContent = `${margem.toFixed(1)}%`;
+        badge.className = `badge margem-badge ${corMargem(margem)}`;
+    }
+}
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // FILTRO CORRIGIDO - busca por dataset, ativa a partir de 1 caractere
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        inputBusca.addEventListener('input', (e) => {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const termo = e.target.value.toLowerCase().trim();
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                const linhas = tabela.querySelectorAll('tr');
+function atualizarProdutoCache(id, novoCusto, novoPreco, novoAtacado, novaQtdMin) {
+    if (!produtosCache[id]) return;
+    produtosCache[id].valorCusto = novoCusto;
+    produtosCache[id].valorVenda = novoPreco;
+    produtosCache[id].precoAtacado = novoAtacado;
+    produtosCache[id].quantidadeMinimaAtacado = novaQtdMin;
+}
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    linhas.forEach(tr => {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            if (termo.length === 0) {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        tr.style.display = '';
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                } else {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const desc = tr.dataset.descricao || '';
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        const cod = tr.dataset.codigo || '';
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // Busca em descrição OU código
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                tr.style.display = (desc.includes(termo) || cod.includes(termo))? '' : 'none';
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            });
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            });
+function filtrarTabela(termo) {
+    const linhas = tabela.querySelectorAll('tr');
+    linhas.forEach(tr => {
+        if (!termo) {
+            tr.style.display = '';
+            return;
+        }
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            carregarAjustes();
+        const desc = tr.dataset.descricao || '';
+        const cod = tr.dataset.codigo || '';
+        tr.style.display = (desc.includes(termo) || cod.includes(termo)) ? '' : 'none';
+    });
+}
+
+// Calculo em tempo real da margem
+if (tabela) {
+    tabela.addEventListener('input', (e) => {
+        if (e.target.classList.contains('edit-custo') || e.target.classList.contains('edit-venda')) {
+            const tr = e.target.closest('tr');
+            if (tr) atualizarMargemLinha(tr);
+        }
+    });
+
+    tabela.addEventListener('click', async (e) => {
+        if (!e.target.classList.contains('btn-salvar')) return;
+
+        const tr = e.target.closest('tr');
+        if (!tr) return;
+
+        const id = tr.dataset.id;
+        const novoCusto = parseFloatSafe(tr.querySelector('.edit-custo').value);
+        const novoPreco = parseFloatSafe(tr.querySelector('.edit-venda').value);
+        const novoAtacado = parseFloatSafe(tr.querySelector('.edit-atacado').value);
+        const novaQtdMin = parseIntSafe(tr.querySelector('.edit-qtd-min').value);
+
+        await update(ref(db, `produtos/${id}`), {
+            valorCusto: novoCusto,
+            valorVenda: novoPreco,
+            precoAtacado: novoAtacado,
+            quantidadeMinimaAtacado: novaQtdMin
+        });
+
+        atualizarProdutoCache(id, novoCusto, novoPreco, novoAtacado, novaQtdMin);
+        alert('Dados atualizados!');
+    });
+}
+
+if (inputBusca) {
+    inputBusca.addEventListener('input', (e) => {
+        filtrarTabela(e.target.value.toLowerCase().trim());
+    });
+}
+
+carregarAjustes();

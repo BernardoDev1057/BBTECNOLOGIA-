@@ -1,6 +1,7 @@
 import { db, auth, ref, push, set, get, update } from './firebase-config.js';
 import { imprimirComprovante } from './impressora.js';
 import { dispararMensagemWhatsApp } from './whatsapp.js';
+import { $, fmtDateBR, fmtMoney, parseFloatSafe, sanitizeDigits, setText } from './utils.js';
 
 let listaClientesMemoria = {};
 let clienteAtualId = null;
@@ -12,9 +13,9 @@ async function carregarClientesCache() {
 }
 
 // Busca preditiva só depois de 3 caracteres
-document.getElementById('contas-busca-cliente').addEventListener('input', (e) => {
+$('contas-busca-cliente').addEventListener('input', (e) => {
     const termo = e.target.value.toLowerCase().trim();
-    const divResultados = document.getElementById('lista-busca-cliente');
+    const divResultados = $('lista-busca-cliente');
     divResultados.innerHTML = '';
 
     if (termo.length < 3) {
@@ -28,10 +29,10 @@ document.getElementById('contas-busca-cliente').addEventListener('input', (e) =>
             if (filtrados++ >= 5) return;
             const item = document.createElement('div');
             item.className = 'busca-item';
-            item.textContent = `${c.nome} - Dívida Total: R$ ${(c.saldoDevedor || 0).toFixed(2)}`;
+            item.textContent = `${c.nome} - Dívida Total: ${fmtMoney(c.saldoDevedor || 0)}`;
             item.addEventListener('click', () => {
-                document.getElementById('contas-busca-cliente').value = c.nome;
-                document.getElementById('contas-cliente-id').value = id;
+                $('contas-busca-cliente').value = c.nome;
+                $('contas-cliente-id').value = id;
                 clienteAtualId = id;
                 divResultados.style.display = 'none';
                 carregarHistoricoTitulos(id);
@@ -39,26 +40,26 @@ document.getElementById('contas-busca-cliente').addEventListener('input', (e) =>
             divResultados.appendChild(item);
         }
     });
-    divResultados.style.display = filtrados > 0? 'block' : 'none';
+    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
 });
 
 // Esconde busca ao clicar fora
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.position-relative')) {
-        document.getElementById('lista-busca-cliente').style.display = 'none';
+        $('lista-busca-cliente').style.display = 'none';
     }
 });
 
 // Checkbox para mostrar cancelados
-document.getElementById('chk-mostrar-cancelados').addEventListener('change', () => {
+$('chk-mostrar-cancelados').addEventListener('change', () => {
     if (clienteAtualId) carregarHistoricoTitulos(clienteAtualId);
 });
 
 // Renderiza histórico
 async function carregarHistoricoTitulos(clienteId) {
     clienteAtualId = clienteId;
-    const tbody = document.getElementById('tabela-historico-contas');
-    const mostrarCancelados = document.getElementById('chk-mostrar-cancelados').checked;
+    const tbody = $('tabela-historico-contas');
+    const mostrarCancelados = $('chk-mostrar-cancelados').checked;
 
     tbody.innerHTML = "<tr><td colspan='5' class='text-center'>Processando histórico...</td></tr>";
 
@@ -95,7 +96,7 @@ async function carregarHistoricoTitulos(clienteId) {
                 txtStatus = `<span class="badge bg-warning text-dark">⚠️ Em Aberto</span>`;
             }
 
-            const dataPagamento = t.dataPagamento? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
+            const dataPagamento = t.dataPagamento ? fmtDateBR(t.dataPagamento) : '-';
 
             let botaoAcao = '';
             if (t.status === 'Aberto' &&!t.cancelado) {
@@ -110,8 +111,8 @@ async function carregarHistoricoTitulos(clienteId) {
             }
 
             tr.innerHTML = `
-                <td>${new Date(t.dataLancamento).toLocaleString('pt-BR')}</td>
-                <td>R$ ${t.valor.toFixed(2)}</td>
+                <td>${fmtDateBR(t.dataLancamento)}</td>
+                <td>${fmtMoney(t.valor)}</td>
                 <td>${txtStatus}</td>
                 <td>${dataPagamento}</td>
                 <td>${botaoAcao}</td>
@@ -126,7 +127,7 @@ window.quitarTitulo = async (tituloId, valorTotal, clienteId) => {
     const cliente = listaClientesMemoria[clienteId];
 
     // Cria modal dinâmico se não existir
-    let modal = document.getElementById('modal-baixa');
+    let modal = $('modal-baixa');
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'modal-baixa';
@@ -176,23 +177,23 @@ window.quitarTitulo = async (tituloId, valorTotal, clienteId) => {
     }
 
     // Preenche dados do modal
-    document.getElementById('modal-cliente-nome').textContent = cliente.nome;
-    document.getElementById('modal-valor-titulo').textContent = `R$ ${valorTotal.toFixed(2)}`;
-    document.getElementById('modal-saldo-cliente').textContent = `R$ ${(cliente.saldoDevedor || 0).toFixed(2)}`;
-    document.getElementById('valor-baixa').max = valorTotal;
-    document.getElementById('valor-baixa').value = valorTotal.toFixed(2);
-    document.getElementById('modal-max-valor').textContent = `Máximo: R$ ${valorTotal.toFixed(2)}`;
+    setText('modal-cliente-nome', cliente.nome);
+    setText('modal-valor-titulo', fmtMoney(valorTotal));
+    setText('modal-saldo-cliente', fmtMoney(cliente.saldoDevedor || 0));
+    $('valor-baixa').max = valorTotal;
+    $('valor-baixa').value = valorTotal.toFixed(2);
+    setText('modal-max-valor', `Máximo: ${fmtMoney(valorTotal)}`);
 
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
 
-    document.getElementById('btn-confirmar-baixa').onclick = async () => {
-        const valorPago = parseFloat(document.getElementById('valor-baixa').value);
-        const formaPg = document.getElementById('forma-pagamento').value;
-        const obs = document.getElementById('obs-baixa').value.trim();
+    $('btn-confirmar-baixa').onclick = async () => {
+        const valorPago = parseFloatSafe($('valor-baixa').value);
+        const formaPg = $('forma-pagamento').value;
+        const obs = $('obs-baixa').value.trim();
         const usuario = auth.currentUser.email;
 
-        if (isNaN(valorPago) || valorPago <= 0) {
+        if (valorPago <= 0) {
             window.mostrarAlertaSistema("Valor inválido", "Erro");
             return;
         }
@@ -221,8 +222,8 @@ window.quitarTitulo = async (tituloId, valorTotal, clienteId) => {
         } else {
             // Baixa parcial: atualiza valor do título atual
             await update(ref(db, `contasReceber/${tituloId}`), {
-                valor: parseFloat(saldoRestanteTitulo.toFixed(2)),
-                observacao: `Baixa parcial de R$ ${valorPago.toFixed(2)} via ${formaPg} em ${new Date().toLocaleDateString('pt-BR')}. ${obs}`
+                valor: parseFloatSafe(saldoRestanteTitulo.toFixed(2)),
+                observacao: `Baixa parcial de ${fmtMoney(valorPago)} via ${formaPg} em ${fmtDateBR(dataPagamento)}. ${obs}`
             });
 
             // Cria registro de pagamento para histórico
@@ -245,13 +246,13 @@ window.quitarTitulo = async (tituloId, valorTotal, clienteId) => {
         }
 
         // 2. Atualiza saldo do cliente
-        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: parseFloat(novoSaldo.toFixed(2)) });
+        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: parseFloatSafe(novoSaldo.toFixed(2)) });
 
-        window.mostrarAlertaSistema(`Baixa de R$ ${valorPago.toFixed(2)} realizada!`, "Sucesso");
+        window.mostrarAlertaSistema(`Baixa de ${fmtMoney(valorPago)} realizada!`, "Sucesso");
 
         // 3. WhatsApp
         if (cliente.telefone) {
-            const msg = `Olá ${cliente.nome}!\n\nRecebemos R$ ${valorPago.toFixed(2)} via ${formaPg}.\nData: ${new Date(dataPagamento).toLocaleString('pt-BR')}\nSaldo devedor restante: R$ ${novoSaldo.toFixed(2)}\n\nObrigado pela preferência!`;
+            const msg = `Olá ${cliente.nome}!\n\nRecebemos ${fmtMoney(valorPago)} via ${formaPg}.\nData: ${fmtDateBR(dataPagamento)}\nSaldo devedor restante: ${fmtMoney(novoSaldo)}\n\nObrigado pela preferência!`;
             dispararMensagemWhatsApp(cliente.telefone, msg);
         }
 
@@ -277,7 +278,7 @@ window.estornarBaixa = async (tituloId, valor, clienteId) => {
             dataEstorno: new Date().toISOString()
         });
 
-        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: parseFloat((saldoAtual + valor).toFixed(2)) });
+        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: parseFloatSafe((saldoAtual + valor).toFixed(2)) });
 
         window.mostrarAlertaSistema("Baixa estornada com sucesso!", "Sucesso");
         await carregarClientesCache();
@@ -292,18 +293,18 @@ window.gerarComprovante = async (tituloId) => {
     const t = snap.val();
     const cliente = listaClientesMemoria[t.clienteId];
 
-    const formaPg = t.formaPagamento? t.formaPagamento.replace('_', ' ') : 'N/I';
+    const formaPg = t.formaPagamento ? t.formaPagamento.replace('_', ' ') : 'N/I';
     const valorPago = t.valorPago || t.valor;
 
     const corpo = `
         <p>Cliente: ${cliente.nome}</p>
-        <p>Data Lançamento: ${new Date(t.dataLancamento).toLocaleString('pt-BR')}</p>
-        <p>Data Pagamento: ${new Date(t.dataPagamento).toLocaleString('pt-BR')}</p>
+        <p>Data Lançamento: ${fmtDateBR(t.dataLancamento)}</p>
+        <p>Data Pagamento: ${fmtDateBR(t.dataPagamento)}</p>
         <p>Forma Pagamento: ${formaPg}</p>
-        <p>Valor Pago: R$ ${valorPago.toFixed(2)}</p>
-        <p>Saldo Devedor Atual: R$ ${(cliente.saldoDevedor).toFixed(2)}</p>
+        <p>Valor Pago: ${fmtMoney(valorPago)}</p>
+        <p>Saldo Devedor Atual: ${fmtMoney(cliente.saldoDevedor)}</p>
         <p>Operador: ${t.usuarioBaixa}</p>
-        ${t.observacao? `<p>Obs: ${t.observacao}</p>` : ''}
+        ${t.observacao ? `<p>Obs: ${t.observacao}</p>` : ''}
     `;
 
     imprimirComprovante('Comprovante de Baixa - Crédito Loja', corpo);

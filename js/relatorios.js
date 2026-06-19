@@ -1,11 +1,12 @@
 import { db, ref, get } from './firebase-config.js';
+import { $, isoDate } from './utils.js';
 
 // Define datas iniciais padrão (Mês atual) na interface ao carregar a página
 const agora = new Date();
-document.getElementById('rep-data-inicio').value = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString().split('T')[0];
-document.getElementById('rep-data-fim').value = agora.toISOString().split('T')[0];
+$('rep-data-inicio').value = isoDate(new Date(agora.getFullYear(), agora.getMonth(), 1));
+$('rep-data-fim').value = isoDate(agora);
 
-document.getElementById('btn-gerar-relatorio').addEventListener('click', processarRelatorio);
+$('btn-gerar-relatorio').addEventListener('click', processarRelatorio);
 
 async function processarRelatorio() {
     const tipo = document.getElementById('rep-tipo').value;

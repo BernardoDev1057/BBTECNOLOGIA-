@@ -1,11 +1,12 @@
 import { db, auth, ref, get } from './firebase-config.js';
+import { $, setText, fmtMoney, isoDate } from './utils.js';
 
 async function processarMétricasDashboard() {
     if (!auth.currentUser) return;
 
     // Pega as datas de controle baseadas no fuso local do dispositivo
     const agora = new Date();
-    const hojeStr = agora.toISOString().split('T')[0]; // Formato "YYYY-MM-DD"
+    const hojeStr = isoDate(agora); // Formato "YYYY-MM-DD"
     const anoMesStr = hojeStr.substring(0, 7); // Formato "YYYY-MM"
 
     // 1. Busca tabelas chaves em paralelo para performance
@@ -26,7 +27,7 @@ async function processarMétricasDashboard() {
     Object.values(produtosMap).forEach(p => {
         if ((p.estoque || 0) <= 10) contagemEstoqueBaixo++;
     });
-    document.getElementById('db-estoque-baixo').textContent = contagemEstoqueBaixo;
+    setText('db-estoque-baixo', contagemEstoqueBaixo);
 
     // ==========================================
     // MÉTRICA B: CONTAS A RECEBER (CRÉDITO LOJA)
@@ -37,7 +38,7 @@ async function processarMétricasDashboard() {
             if (r.status === 'Aberto') totalContasReceber += r.valor;
         });
     }
-    document.getElementById('db-contas-receber').textContent = `R$ ${totalContasReceber.toFixed(2)}`;
+    setText('db-contas-receber', fmtMoney(totalContasReceber));
 
     // ==========================================
     // MÉTRICAS C: VENDAS, LUCRO, TICKET MÉDIO e RANKING
@@ -84,13 +85,13 @@ async function processarMétricasDashboard() {
 
     const ticketMedio = qtdVendasHoje > 0 ? (faturamentoHoje / qtdVendasHoje) : 0;
 
-    document.getElementById('db-vendas-hoje').textContent = `R$ ${faturamentoHoje.toFixed(2)}`;
-    document.getElementById('db-vendas-mes').textContent = `R$ ${faturamentoMes.toFixed(2)}`;
-    document.getElementById('db-lucro').textContent = `R$ ${totalLucro.toFixed(2)}`;
-    document.getElementById('db-ticket').textContent = `R$ ${ticketMedio.toFixed(2)}`;
+    setText('db-vendas-hoje', fmtMoney(faturamentoHoje));
+    setText('db-vendas-mes', fmtMoney(faturamentoMes));
+    setText('db-lucro', fmtMoney(totalLucro));
+    setText('db-ticket', fmtMoney(ticketMedio));
 
     // RENDERIZAR TABELA DE MAIS VENDIDOS (TOP 5)
-    const tabelaRanking = document.getElementById('tabela-mais-vendidos');
+    const tabelaRanking = $('tabela-mais-vendidos');
     tabelaRanking.innerHTML = '';
     
     const produtosOrdenados = Object.entries(rankingProdutos)
@@ -151,9 +152,9 @@ async function processarMétricasDashboard() {
             if (sanSnap.exists()) {
                 Object.values(sanSnap.val()).forEach(s => { if (s.caixaId === caixaAtivoId) saldoDinheiroCaixa -= s.valor; });
             }
-            document.getElementById('db-caixa-atual').textContent = `R$ ${saldoDinheiroCaixa.toFixed(2)}`;
+            setText('db-caixa-atual', fmtMoney(saldoDinheiroCaixa));
         } else {
-            document.getElementById('db-caixa-atual').textContent = "Caixa Fechado";
+            setText('db-caixa-atual', "Caixa Fechado");
         }
     }
 }

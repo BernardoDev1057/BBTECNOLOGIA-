@@ -1,6 +1,7 @@
 import { db, auth, ref, push, set, get, update, onAuthStateChanged } from './firebase-config.js';
 import { dispararMensagemWhatsApp } from './whatsapp.js';
 import { imprimirComprovante } from './impressora.js';
+import { $, fmtMoney, fmtDateBR, parseFloatSafe } from './utils.js';
 
 // Estados de Controle Globais do Turno
 let caixaAtivoId = null;
@@ -65,7 +66,7 @@ async function verificarFluxoCaixa() {
 
 // Botão: Abrir Turno
 document.getElementById('btn-confirmar-abertura').addEventListener('click', async () => {
-    const troco = parseFloat(document.getElementById('caixa-troco-inicial').value) || 0;
+    const troco = parseFloatSafe($('caixa-troco-inicial').value);
     const novaRef = push(ref(db, 'caixas'));
 
     await set(novaRef, {
@@ -103,14 +104,14 @@ navBtnFechar.addEventListener('click', async () => {
     });
 
     const esperado = valorInicialTroco + totalDinheiroVendas + totalSuprimentos - totalSangrias;
-    document.getElementById('txt-valor-esperado').textContent = esperado.toFixed(2);
+    $('txt-valor-esperado').textContent = esperado.toFixed(2);
 });
 
 // Registrar Sangria / Suprimento
 document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async () => {
-    const tipo = document.getElementById('modal-mov-tipo').value;
-    const valor = parseFloat(document.getElementById('modal-mov-valor').value);
-    const justificativa = document.getElementById('modal-mov-justificativa').value;
+    const tipo = $('modal-mov-tipo').value;
+    const valor = parseFloatSafe($('modal-mov-valor').value);
+    const justificativa = $('modal-mov-justificativa').value;
 
     if(isNaN(valor) || valor <= 0 ||!justificativa.trim()) {
         return window.mostrarAlertaSistema("Preencha valor e justificativa!", "Validação");
@@ -133,8 +134,8 @@ document.getElementById('btn-salvar-mov-caixa').addEventListener('click', async 
     `);
     window.mostrarAlertaSistema(`${tipo} lançado com sucesso!`, "Movimentação");
     window.modalSangria.hide();
-    document.getElementById('modal-mov-valor').value = '';
-    document.getElementById('modal-mov-justificativa').value = '';
+    $('modal-mov-valor').value = '';
+    $('modal-mov-justificativa').value = '';
 });
 
 // Confirmar Encerramento de Caixa
