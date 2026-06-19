@@ -42,7 +42,7 @@ async function processarRelatorio() {
     // ==========================================
     if (tipo === 'vendas_periodo') {
         titulo.textContent = `Relatório de Faturamento por Período (${dataInicio} até ${dataFim})`;
-        colunas.innerHTML = `<th>Data</th><th>Qtd Itens Vendidos</th><th>Forma de Pagamento</th><th>Valor Total</th>`;
+        colunas.innerHTML = `<th>Data</th><th>Qtd Itens Vendidos</th><th>Forma de Pagamento</th><th>Cliente</th><th>Valor Total</th>`;
         
         const filtradas = filtrarPorData(vendas, 'dataHora');
         corpo.innerHTML = '';
@@ -51,11 +51,16 @@ async function processarRelatorio() {
         filtradas.forEach(v => {
             faturamentoAcumulado += v.total;
             let totalItens = v.items ? v.items.reduce((acc, i) => acc + i.quantidade, 0) : 0;
+
+            const nomeCliente = v.clienteId && clientes[v.clienteId] 
+                        ? clientes[v.clienteId].nome 
+                                    : 'Consumidor Final';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${new Date(v.dataHora).toLocaleString('pt-BR')}</td>
                 <td>${totalItens}</td>
                 <td>${v.formaPagamento}</td>
+                <td>${nomeCliente}</td>
                 <td>R$ ${v.total.toFixed(2)}</td>
             `;
             corpo.appendChild(tr);

@@ -116,7 +116,7 @@ async function enviarMensagemCobranca(id) {
         // Limite disponível é o total cadastrado menos o que o cliente já deve
         const limiteDisponivel = Math.max(0, limiteTotal - saldoDevedor);
 
-        const textoMensagem = `Sra. ${nome},\n\n` +
+        const textoMensagem = `Sr(a). ${nome},\n\n` +
             `📌 *Saldo em aberto:* R$ ${saldoDevedor.toFixed(2)}\n` +
             `📈 *Limite disponível:* R$ ${limiteDisponivel.toFixed(2)}\n\n` +
             `Para liquidação imediata via PIX ou pagamento em espécie, responda esta mensagem. Nossa equipe realizará a baixa na sua conta com total discrição.\n\n` +

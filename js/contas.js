@@ -1,36 +1,26 @@
 import { db, auth, ref, push, set, get, update } from './firebase-config.js';
+import { imprimirComprovante } from './impressora.js';
+import { dispararMensagemWhatsApp } from './whatsapp.js';
 
 let listaClientesMemoria = {};
-let caixaAtivoId = null;
+let clienteAtualId = null;
 
-// Prevenção logística: Garante que o operador abriu o caixa antes de receber dinheiro de dívida
-async function verificarCaixaParaRecebimento() {
-    if (!auth.currentUser) return;
-    const snapshot = await get(ref(db, 'caixas'));
-    if (snapshot.exists()) {
-        for (let id in snapshot.val()) {
-            const cx = snapshot.val()[id];
-            if (cx.operador === auth.currentUser.email && cx.status === 'Aberto') {
-                caixaAtivoId = id;
-                return;
-            }
-        }
-    }
-}
-
-// Carrega a listagem de clientes em cache para o sistema de busca rápida
+// Carrega clientes em cache
 async function carregarClientesCache() {
     const cliSnap = await get(ref(db, 'clientes'));
     if (cliSnap.exists()) listaClientesMemoria = cliSnap.val();
 }
 
-// Mecanismo de busca preditiva por digitação
+// Busca preditiva só depois de 3 caracteres
 document.getElementById('contas-busca-cliente').addEventListener('input', (e) => {
     const termo = e.target.value.toLowerCase().trim();
     const divResultados = document.getElementById('lista-busca-cliente');
     divResultados.innerHTML = '';
 
-    if (!termo) { divResultados.style.display = 'none'; return; }
+    if (termo.length < 3) {
+        divResultados.style.display = 'none';
+        return;
+    }
 
     let filtrados = 0;
     Object.entries(listaClientesMemoria).forEach(([id, c]) => {
@@ -42,19 +32,35 @@ document.getElementById('contas-busca-cliente').addEventListener('input', (e) =>
             item.addEventListener('click', () => {
                 document.getElementById('contas-busca-cliente').value = c.nome;
                 document.getElementById('contas-cliente-id').value = id;
+                clienteAtualId = id;
                 divResultados.style.display = 'none';
                 carregarHistoricoTitulos(id);
             });
             divResultados.appendChild(item);
         }
     });
-    divResultados.style.display = filtrados > 0 ? 'block' : 'none';
+    divResultados.style.display = filtrados > 0? 'block' : 'none';
 });
 
-// Busca e renderiza o histórico do cliente selecionado (Abertos e Pagos)
+// Esconde busca ao clicar fora
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.position-relative')) {
+        document.getElementById('lista-busca-cliente').style.display = 'none';
+    }
+});
+
+// Checkbox para mostrar cancelados
+document.getElementById('chk-mostrar-cancelados').addEventListener('change', () => {
+    if (clienteAtualId) carregarHistoricoTitulos(clienteAtualId);
+});
+
+// Renderiza histórico
 async function carregarHistoricoTitulos(clienteId) {
+    clienteAtualId = clienteId;
     const tbody = document.getElementById('tabela-historico-contas');
-    tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Processando histórico...</td></tr>";
+    const mostrarCancelados = document.getElementById('chk-mostrar-cancelados').checked;
+
+    tbody.innerHTML = "<tr><td colspan='5' class='text-center'>Processando histórico...</td></tr>";
 
     const recSnap = await get(ref(db, 'contasReceber'));
     tbody.innerHTML = '';
@@ -62,29 +68,48 @@ async function carregarHistoricoTitulos(clienteId) {
     if (recSnap.exists()) {
         let titulosEncontrados = [];
         Object.entries(recSnap.val()).forEach(([id, r]) => {
-            if (r.clienteId === clienteId) titulosEncontrados.push({ id, ...r });
+            if (r.clienteId === clienteId) {
+                // Se não mostrar cancelados, filtra eles
+                if (!mostrarCancelados && r.cancelado) return;
+                titulosEncontrados.push({ id,...r });
+            }
         });
 
-        // Ordena do mais recente para o mais antigo
         titulosEncontrados.sort((a, b) => new Date(b.dataLancamento) - new Date(a.dataLancamento));
 
         if (titulosEncontrados.length === 0) {
-            tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Nenhum histórico de Crédito Loja encontrado para este cliente.</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='5' class='text-center text-muted'>Nenhum título encontrado.</td></tr>";
             return;
         }
 
         titulosEncontrados.forEach(t => {
             const tr = document.createElement('tr');
-            
-            const txtStatus = t.status === 'Pago' 
-                ? `<span class="status-pago">✓ Pago</span>` 
-                : `<span class="status-aberto">⚠️ Em Aberto</span>`;
-                
-            const dataPagamento = t.dataPagamento ? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
-            
-            const botaoAcao = t.status === 'Aberto' 
-                ? `<button class="btn-pagar" onclick="window.quitarTitulo('${t.id}', ${t.valor}, '${clienteId}')">Baixar Pagamento</button>` 
-                : `<span style="color:#666; font-size:12px;">Título Liquidado</span>`;
+
+            // Se for cancelado, deixa a linha apagada
+            if (t.cancelado) tr.classList.add('table-secondary');
+
+            let txtStatus = '';
+            if (t.cancelado) {
+                txtStatus = `<span class="badge bg-secondary">✗ Cancelado</span>`;
+            } else if (t.status === 'Pago') {
+                txtStatus = `<span class="badge bg-success">✓ Pago</span>`;
+            } else {
+                txtStatus = `<span class="badge bg-warning text-dark">⚠️ Em Aberto</span>`;
+            }
+
+            const dataPagamento = t.dataPagamento? new Date(t.dataPagamento).toLocaleString('pt-BR') : '-';
+
+            let botaoAcao = '';
+            if (t.status === 'Aberto' &&!t.cancelado) {
+                botaoAcao = `<button class="btn btn-sm btn-success" onclick="window.quitarTitulo('${t.id}', ${t.valor}, '${clienteId}')">Baixar</button>`;
+            } else if (t.status === 'Pago' &&!t.cancelado) {
+                botaoAcao = `
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.gerarComprovante('${t.id}')">Comprovante</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="window.estornarBaixa('${t.id}', ${t.valor}, '${clienteId}')">Estornar</button>
+                `;
+            } else if (t.cancelado) {
+                botaoAcao = `<small class="text-muted">${t.motivoCancelamento || 'Cancelado'}</small>`;
+            }
 
             tr.innerHTML = `
                 <td>${new Date(t.dataLancamento).toLocaleString('pt-BR')}</td>
@@ -95,56 +120,90 @@ async function carregarHistoricoTitulos(clienteId) {
             `;
             tbody.appendChild(tr);
         });
-    } else {
-        tbody.innerHTML = "<tr><td colspan='5' style='text-align:center;'>Nenhum registro de contas encontrado no sistema.</td></tr>";
     }
 }
 
-// Função de Quitação de Dívidas (Baixa do Título)
+// BAIXA - NÃO AFETA CAIXA
 window.quitarTitulo = async (tituloId, valor, clienteId) => {
-    if (!caixaAtivoId) {
-        alert("ERRO LOGÍSTICO: Você não pode receber pagamentos sem ter um CAIXA ABERTO em seu turno! Abra o caixa primeiro.");
-        return;
-    }
-
-    const conf = confirm(`Confirmar o recebimento em dinheiro/PIX do valor de R$ ${valor.toFixed(2)}?`);
+    const cliente = listaClientesMemoria[clienteId];
+    const conf = confirm(`Confirmar baixa de R$ ${valor.toFixed(2)} para ${cliente.nome}?`);
     if (!conf) return;
 
-    // 1. Atualiza o status do Título específico para Pago
+    const dataPagamento = new Date().toISOString();
+    const usuario = auth.currentUser.email;
+    const saldoAnterior = cliente.saldoDevedor || 0;
+    const novoSaldo = Math.max(0, saldoAnterior - valor);
+
+    // 1. Marca título como Pago
     await update(ref(db, `contasReceber/${tituloId}`), {
         status: 'Pago',
-        dataPagamento: new Date().toISOString()
+        dataPagamento: dataPagamento,
+        cancelado: false,
+        usuarioBaixa: usuario
     });
 
-    // 2. Deduz o valor pago do Saldo Devedor Global do Cliente
-    const cliSnap = await get(ref(db, `clientes/${clienteId}`));
-    if (cliSnap.exists()) {
-        const saldoAtual = cliSnap.val().saldoDevedor || 0;
-        let novoSaldo = saldoAtual - valor;
-        if (novoSaldo < 0) novoSaldo = 0; // Proteção contra saldos negativos
+    // 2. Atualiza saldo do cliente
+    await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: novoSaldo });
 
-        await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: novoSaldo });
+    alert("Baixa realizada com sucesso!");
+
+    // 3. Gera comprovante
+    gerarComprovante(tituloId);
+
+    // 4. Envia WhatsApp
+    if (cliente.telefone) {
+        const msg = `Olá ${cliente.nome}!\n\nRecebemos o pagamento de R$ ${valor.toFixed(2)} referente ao seu débito.\nData: ${new Date(dataPagamento).toLocaleString('pt-BR')}\nSaldo devedor restante: R$ ${novoSaldo.toFixed(2)}\n\nObrigado pela preferência!`;
+        dispararMensagemWhatsApp(cliente.telefone, msg);
     }
 
-    // 3. Injeta a entrada do dinheiro como Suprimento de Recebimento no caixa ativo do operador
-    await set(push(ref(db, 'suprimentos')), {
-        caixaId: caixaAtivoId,
-        valor: valor,
-        justificativa: `Recebimento de Crédito Loja - Cliente: ${listaClientesMemoria[clienteId].nome}`,
-        usuario: auth.currentUser.email,
-        dataHora: new Date().toISOString()
-    });
-
-    alert("Pagamento processado e baixado com sucesso!");
-    
-    // Atualiza a tela e recarrega os caches
     await carregarClientesCache();
     carregarHistoricoTitulos(clienteId);
 };
 
-// Inicialização imediata com verificação de segurança
-setTimeout(() => {
-    verificarCaixaParaRecebimento();
-    carregarClientesCache();
-}, 1500);
+// SOFT DELETE / ESTORNO
+window.estornarBaixa = async (tituloId, valor, clienteId) => {
+    const conf = confirm(`Estornar esta baixa? O título voltará para "Em Aberto" e o saldo será restaurado.`);
+    if (!conf) return;
 
+    const cliente = listaClientesMemoria[clienteId];
+    const saldoAtual = cliente.saldoDevedor || 0;
+
+    await update(ref(db, `contasReceber/${tituloId}`), {
+        status: 'Aberto',
+        dataPagamento: null,
+        cancelado: true,
+        motivoCancelamento: 'Estorno de baixa',
+        usuarioEstorno: auth.currentUser.email,
+        dataEstorno: new Date().toISOString()
+    });
+
+    await update(ref(db, `clientes/${clienteId}`), { saldoDevedor: saldoAtual + valor });
+
+    alert("Baixa estornada com sucesso!");
+    await carregarClientesCache();
+    carregarHistoricoTitulos(clienteId);
+};
+
+// GERA COMPROVANTE usando impressora.js
+window.gerarComprovante = async (tituloId) => {
+    const snap = await get(ref(db, `contasReceber/${tituloId}`));
+    if (!snap.exists()) return;
+    const t = snap.val();
+    const cliente = listaClientesMemoria[t.clienteId];
+
+    const corpo = `
+        <p>Cliente: ${cliente.nome}</p>
+        <p>Data Lançamento: ${new Date(t.dataLancamento).toLocaleString('pt-BR')}</p>
+        <p>Data Pagamento: ${new Date(t.dataPagamento).toLocaleString('pt-BR')}</p>
+        <p>Valor Pago: R$ ${t.valor.toFixed(2)}</p>
+        <p>Saldo Devedor Atual: R$ ${(cliente.saldoDevedor).toFixed(2)}</p>
+        <p>Operador: ${t.usuarioBaixa}</p>
+    `;
+
+    imprimirComprovante('Comprovante de Baixa - Crédito Loja', corpo);
+};
+
+// Init
+setTimeout(() => {
+    carregarClientesCache();
+}, 1000);
