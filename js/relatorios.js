@@ -1,21 +1,44 @@
 import { db, ref, get } from './firebase-config.js';
 import { $, isoDate } from './utils.js';
 
-// Define datas iniciais padrão (Mês atual) na interface ao carregar a página
-const agora = new Date();
-$('rep-data-inicio').value = isoDate(new Date(agora.getFullYear(), agora.getMonth(), 1));
-$('rep-data-fim').value = isoDate(agora);
+window.addEventListener('DOMContentLoaded', () => {
+    const agora = new Date();
+    const inputInicio = $('rep-data-inicio');
+    const inputFim = $('rep-data-fim');
 
-$('btn-gerar-relatorio').addEventListener('click', processarRelatorio);
+    if (inputInicio) {
+        inputInicio.value = isoDate(new Date(agora.getFullYear(), agora.getMonth(), 1));
+    }
+    if (inputFim) {
+        inputFim.value = isoDate(agora);
+    }
+
+    const btnGerar = $('btn-gerar-relatorio');
+    if (btnGerar) {
+        btnGerar.addEventListener('click', processarRelatorio);
+    }
+});
 
 async function processarRelatorio() {
-    const tipo = document.getElementById('rep-tipo').value;
-    const dataInicio = document.getElementById('rep-data-inicio').value;
-    const dataFim = document.getElementById('rep-data-fim').value;
+    const selectTipo = $('rep-tipo');
+    const inputInicio = $('rep-data-inicio');
+    const inputFim = $('rep-data-fim');
+    const selectForma = $('rep-forma-pagamento');
+    const colunas = $('colunas-relatorio');
+    const corpo = $('corpo-relatorio');
+    const titulo = $('titulo-relatorio');
 
-    const colunas = document.getElementById('colunas-relatorio');
-    const corpo = document.getElementById('corpo-relatorio');
-    const titulo = document.getElementById('titulo-relatorio');
+    if (!selectTipo || !inputInicio || !inputFim || !colunas || !corpo || !titulo) {
+        console.error('Elementos essenciais do relatório não encontrados:', {
+            selectTipo, inputInicio, inputFim, selectForma, colunas, corpo, titulo
+        });
+        return;
+    }
+
+    const tipo = selectTipo.value;
+    const dataInicio = inputInicio.value || '';
+    const dataFim = inputFim.value || '';
+    const formaPagamentoFiltro = selectForma ? selectForma.value : 'todos';
 
     corpo.innerHTML = "<tr><td style='text-align:center;'>Buscando registros...</td></tr>";
 
@@ -38,6 +61,38 @@ async function processarRelatorio() {
         });
     };
 
+    const obterFormasPagamento = (venda) => {
+        if (venda.pagamento) {
+            const formas = [];
+            if (venda.pagamento.dinheiro > 0) formas.push('DINHEIRO');
+            if (venda.pagamento.pix > 0) formas.push('PIX');
+            if (venda.pagamento.debito > 0) formas.push('DEBITO');
+            if (venda.pagamento.credito > 0) formas.push('CREDITO');
+            if (venda.pagamento.creditoLoja > 0) formas.push('CREDITO_LOJA');
+            return formas;
+        }
+        if (venda.formaPagamento) return [venda.formaPagamento.toUpperCase()];
+        if (venda.formaPgto) return [venda.formaPgto.toUpperCase()];
+        return [];
+    };
+
+    const matchesFormaPagamento = (venda, filtro) => {
+        if (filtro === 'todos') return true;
+        const formas = obterFormasPagamento(venda);
+        if (filtro === 'credito') {
+            return formas.includes('CREDITO') && !formas.includes('CREDITO_LOJA');
+        }
+        if (filtro === 'credito_loja') {
+            return formas.includes('CREDITO_LOJA');
+        }
+        return formas.includes(filtro.toUpperCase());
+    };
+
+    const formatarFormaPagamentoRelatorio = (venda) => {
+        const formas = obterFormasPagamento(venda);
+        return formas.length ? formas.join(' + ') : 'N/I';
+    };
+
     // ==========================================
     // RELATÓRIO 1: VENDAS POR PERÍODO (DIA/MÊS)
     // ==========================================
@@ -45,7 +100,7 @@ async function processarRelatorio() {
         titulo.textContent = `Relatório de Faturamento por Período (${dataInicio} até ${dataFim})`;
         colunas.innerHTML = `<th>Data</th><th>Qtd Itens Vendidos</th><th>Forma de Pagamento</th><th>Cliente</th><th>Valor Total</th>`;
         
-        const filtradas = filtrarPorData(vendas, 'dataHora');
+        const filtradas = filtrarPorData(vendas, 'dataHora').filter(v => matchesFormaPagamento(v, formaPagamentoFiltro));
         corpo.innerHTML = '';
         let faturamentoAcumulado = 0;
 
@@ -53,14 +108,14 @@ async function processarRelatorio() {
             faturamentoAcumulado += v.total;
             let totalItens = v.items ? v.items.reduce((acc, i) => acc + i.quantidade, 0) : 0;
 
-            const nomeCliente = v.clienteId && clientes[v.clienteId] 
-                        ? clientes[v.clienteId].nome 
+            const nomeCliente = v.clienteId && clientes[v.clienteId]
+                        ? clientes[v.clienteId].nome
                                     : 'Consumidor Final';
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${new Date(v.dataHora).toLocaleString('pt-BR')}</td>
                 <td>${totalItens}</td>
-                <td>${v.formaPagamento}</td>
+                <td>${formatarFormaPagamentoRelatorio(v)}</td>
                 <td>${nomeCliente}</td>
                 <td>R$ ${v.total.toFixed(2)}</td>
             `;

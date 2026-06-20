@@ -308,6 +308,7 @@ function renderizarCarrinhoHTML() {
         tbody.appendChild(tr);
     });
     document.getElementById('pdv-total-venda').textContent = totalVendaGlobal.toFixed(2);
+    atualizarResumoPagamento();
 }
 
 window.removerItemCarrinho = (index) => {
@@ -315,22 +316,67 @@ window.removerItemCarrinho = (index) => {
     renderizarCarrinhoHTML();
 };
 
+function obterValoresPagamento() {
+    return {
+        dinheiro: parseFloatSafe($('pdv-valor-dinheiro').value),
+        pix: parseFloatSafe($('pdv-valor-pix').value),
+        debito: parseFloatSafe($('pdv-valor-debito').value),
+        credito: parseFloatSafe($('pdv-valor-credito').value),
+        creditoLoja: parseFloatSafe($('pdv-valor-credito-loja').value)
+    };
+}
+
+function calcularTotalPago() {
+    const pagamento = obterValoresPagamento();
+    return parseFloat((pagamento.dinheiro + pagamento.pix + pagamento.debito + pagamento.credito + pagamento.creditoLoja).toFixed(2));
+}
+
+function gerarDescricaoPagamento(pagamento) {
+    const partes = [];
+    if (pagamento.dinheiro > 0) partes.push(`Dinheiro R$ ${pagamento.dinheiro.toFixed(2)}`);
+    if (pagamento.pix > 0) partes.push(`PIX R$ ${pagamento.pix.toFixed(2)}`);
+    if (pagamento.debito > 0) partes.push(`Débito R$ ${pagamento.debito.toFixed(2)}`);
+    if (pagamento.credito > 0) partes.push(`Crédito R$ ${pagamento.credito.toFixed(2)}`);
+    if (pagamento.creditoLoja > 0) partes.push(`Crédito Loja R$ ${pagamento.creditoLoja.toFixed(2)}`);
+    return partes.join(' + ') || 'Nenhum pagamento informado';
+}
+
+function atualizarResumoPagamento() {
+    const totalPago = calcularTotalPago();
+    const troco = parseFloat((totalPago - totalVendaGlobal).toFixed(2));
+    $('pdv-total-pago').textContent = `R$ ${totalPago.toFixed(2)}`;
+    $('pdv-troco').textContent = `R$ ${troco >= 0 ? troco.toFixed(2) : 0.00}`;
+}
+
+['pdv-valor-dinheiro', 'pdv-valor-pix', 'pdv-valor-debito', 'pdv-valor-credito', 'pdv-valor-credito-loja'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('input', atualizarResumoPagamento);
+    }
+});
+
 // Fechamento de Cupom
 document.getElementById('btn-finalizar-venda').addEventListener('click', async () => {
     if(carrinho.length === 0) return window.mostrarAlertaSistema("Carrinho vazio!", "Aviso");
 
     const clienteId = document.getElementById('pdv-cliente-id-selecionado').value;
-    const formaPagamento = document.getElementById('pdv-forma-pagamento').value;
+    const pagamento = obterValoresPagamento();
+    const totalPago = calcularTotalPago();
 
-    // Fiado: valida limite e cria conta a receber
-    if (formaPagamento === 'CREDITO_LOJA') {
+    if (totalPago < totalVendaGlobal) {
+        return window.mostrarAlertaSistema(`Pagamento insuficiente. Total da venda R$ ${totalVendaGlobal.toFixed(2)} e pago R$ ${totalPago.toFixed(2)}.`, "Atenção");
+    }
+
+    const troco = parseFloat((totalPago - totalVendaGlobal).toFixed(2));
+
+    if (pagamento.creditoLoja > 0) {
         if(!clienteId) return window.mostrarAlertaSistema("Selecione um cliente para venda fiada!", "Bloqueio");
 
         const cliSnap = await get(ref(db, `clientes/${clienteId}`));
         if(!cliSnap.exists()) return window.mostrarAlertaSistema("Cliente não encontrado!", "Erro");
 
         const cli = cliSnap.val();
-        const dividaFinal = parseFloat(((cli.saldoDevedor || 0) + totalVendaGlobal).toFixed(2));
+        const dividaFinal = parseFloat(((cli.saldoDevedor || 0) + pagamento.creditoLoja).toFixed(2));
 
         if(dividaFinal > (cli.limiteCredito || 0)) {
             return window.mostrarAlertaSistema(`BLOQUEADO: Limite R$ ${(cli.limiteCredito || 0).toFixed(2)} excedido`, "Limite");
@@ -340,7 +386,7 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         await set(push(ref(db, 'contasReceber')), {
             clienteId,
             clienteNome: cli.nome,
-            valor: totalVendaGlobal,
+            valor: pagamento.creditoLoja,
             status: 'Aberto',
             dataLancamento: new Date().toISOString()
         });
@@ -362,7 +408,9 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         clienteId: clienteId || null,
         items: carrinho,
         total: parseFloat(totalVendaGlobal.toFixed(2)),
-        formaPagamento,
+        pagamento: pagamento,
+        totalPago: totalPago,
+        troco: troco,
         dataHora: new Date().toISOString()
     });
 
@@ -374,6 +422,8 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         </div>
     `).join('');
 
+    const descricaoPagamento = gerarDescricaoPagamento(pagamento);
+
     imprimirComprovante("CUPOM FISCAL", `
         <div style="font-size: 14px;">
             <p><strong>Operador:</strong> ${auth.currentUser.email}</p>
@@ -382,7 +432,9 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             ${itensHtml}
             <hr>
             <p style="font-size: 18px; text-align: right;"><strong>TOTAL: R$ ${totalVendaGlobal.toFixed(2)}</strong></p>
-            <p><strong>Forma de Pagto:</strong> ${formaPagamento}</p>
+            <p><strong>Pagamento:</strong> ${descricaoPagamento}</p>
+            <p><strong>Total Pago:</strong> R$ ${totalPago.toFixed(2)}</p>
+            <p><strong>Troco:</strong> R$ ${troco.toFixed(2)}</p>
         </div>
     `);
 
@@ -399,7 +451,9 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             });
             cupomTexto += `--------------------------\n`;
             cupomTexto += `TOTAL: R$ ${totalVendaGlobal.toFixed(2)}\n`;
-            cupomTexto += `Pagamento: ${formaPagamento}\n\nObrigado!`;
+            cupomTexto += `Pagamento: ${descricaoPagamento}\n`;
+            cupomTexto += `Pago: R$ ${totalPago.toFixed(2)}\n`;
+            cupomTexto += `Troco: R$ ${troco.toFixed(2)}\n\nObrigado!`;
             dispararMensagemWhatsApp(dadosCliente.telefone, cupomTexto);
         });
     }
