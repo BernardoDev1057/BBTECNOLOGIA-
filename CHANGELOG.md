@@ -1,21 +1,25 @@
+
 # Changelog
 
-## [v1.0.1] - 2026-06-27
-
-- feat: cria central de informações do sistema
-
-
-- feat: cria central de informações do sistema
-
-
-
-
+Todas as alterações importantes deste projeto serão documentadas neste arquivo.
 
 O formato segue o padrão Keep a Changelog e utiliza Versionamento Semântico (SemVer).
 
 ---
 
-[1.0.0] - 2026-06-27
+## [v1.1.0] - 2026-06-27
+
+### Adicionado
+
+- Central de informações do sistema.
+- Nova página "Sobre".
+- Exibição da versão, build, commit, branch e release.
+- Informações do ambiente de execução.
+- Informações da sessão do usuário.
+- Estatísticas do Firebase Realtime Database.
+
+
+## [1.0.0] - 2026-06-27
 
 Adicionado
 
