@@ -6,6 +6,18 @@ Todas as alterações importantes deste projeto serão documentadas neste arquiv
 O formato segue o padrão Keep a Changelog e utiliza Versionamento Semântico (SemVer).
 
 
+## [v1.0.2] - 2026-06-27
+
+### Alterações
+
+- fix(caixa): adiciona telefone e endereço na venda pendente e corrige remoção
+- fix(dashboard): corrige renderização e escuta de entregas pendentes
+- fix(caixa): corrige abertura do modal de sangria utilizando data-attributes
+- fix(pdv): anexa dados de contato do cliente no fluxo de vendas pendentes
+
+---
+
+
 ## [v1.0.1] - 2026-06-27
 
 ### Alterações

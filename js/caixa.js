@@ -1,4 +1,4 @@
-import { db, auth, ref, push, set, get, update, onAuthStateChanged } from './firebase-config.js';
+import { db, auth, ref, push, remove, set, get, update, onAuthStateChanged } from './firebase-config.js';
 import { dispararMensagemWhatsApp } from './whatsapp.js';
 import { imprimirComprovante } from './impressora.js';
 import { $, fmtMoney, fmtDateBR, parseFloatSafe } from './utils.js';
@@ -402,25 +402,26 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
             await update(ref(db, `produtos/${item.id}`), { estoque: estoqueAtual - item.quantidade });
         }
     }
-
-    // GRAVA VENDA
+    // GRAVA VENDA DEFINITIVA NO HISTÓRICO
     await set(push(ref(db, 'vendas')), {
         caixaId: caixaAtivoId,
         operador: auth.currentUser.email,
         clienteId: clienteId || null,
+        clienteNome: clienteId ? listaClientesMemoria[clienteId].nome : null,
         items: carrinho,
         total: parseFloat(totalVendaGlobal.toFixed(2)),
         pagamento: pagamento,
         totalPago: totalPago,
         troco: troco,
+        status: 'Finalizada', // Muda o status para sair das pendências do dashboard
         dataHora: new Date().toISOString()
     });
 
-// Cole estas linhas no fluxo de sucesso do fechamento normal da venda (F10):
-if (vendaPendenteEmEdicaoId) {
-    await remove(ref(db, `vendas_pendentes/${vendaPendenteEmEdicaoId}`));
-    vendaPendenteEmEdicaoId = null;
-}
+    // Remove das vendas pendentes se ela veio de uma entrega concluída
+    if (vendaPendenteEmEdicaoId) {
+        await remove(ref(db, `vendas_pendentes/${vendaPendenteEmEdicaoId}`));
+        vendaPendenteEmEdicaoId = null;
+    }
 
 
     // Impressão do Cupom
@@ -478,25 +479,30 @@ if (vendaPendenteEmEdicaoId) {
 // CONTROLADOR DE VENDAS PENDENTES CORRIGIDO
 // ==========================================
 
+
 // 1. SALVAR OU ATUALIZAR A VENDA COMO PENDENTE E GERAR COMANDA
 document.getElementById('btn-pendente-venda').addEventListener('click', async () => {
     if (carrinho.length === 0) return window.mostrarAlertaSistema("Carrinho vazio!", "Aviso");
-    
+
     const clienteId = document.getElementById('pdv-cliente-id-selecionado').value;
     if (!clienteId) {
         return window.mostrarAlertaSistema("Selecione um cliente para registrar a entrega pendente!", "Atenção");
     }
 
     const dadosCliente = listaClientesMemoria[clienteId];
-    
+    const enderecoCompleto = `${dadosCliente.rua || 'Não informado'}, ${dadosCliente.bairro || ''}`;
+
+    // Agora salvamos a estrutura completa para o Dashboard e para o Motoboy
     const vendaPendente = {
         caixaId: caixaAtivoId,
         operador: auth.currentUser.email,
         clienteId: clienteId,
         clienteNome: dadosCliente.nome,
+        clienteTelefone: dadosCliente.telefone || 'Não informado',
+        enderecoEntrega: enderecoCompleto,
         items: carrinho,
         total: parseFloat(totalVendaGlobal.toFixed(2)),
-        status: 'Pendente',
+        status: 'Pendente', // Dashboard filtra por aqui
         dataHora: new Date().toISOString()
     };
 
@@ -508,7 +514,7 @@ document.getElementById('btn-pendente-venda').addEventListener('click', async ()
         await set(novaPendenciaRef, vendaPendente);
     }
 
-    // Impressão da Comanda de Entrega para o Motoboy
+    // Impressão da Comanda de Entrega para o Motoboy com dados destacados
     let itensHtml = carrinho.map(item => `
         <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
             <span>${item.quantidade}x ${item.descricao}</span>
@@ -516,30 +522,29 @@ document.getElementById('btn-pendente-venda').addEventListener('click', async ()
         </div>
     `).join('');
 
-    const endereco = `${dadosCliente.rua || 'Não informado'}, ${dadosCliente.bairro || ''}`;
-
     imprimirComprovante("COMANDA DE ENTREGA (PENDENTE)", `
         <div style="font-size: 14px; font-family: monospace;">
-            <p><strong>Cliente:</strong> ${dadosCliente.nome}</p>
-            <p><strong>Telefone:</strong> ${dadosCliente.telefone || 'N/I'}</p>
-            <p><strong>Endereço:</strong> ${endereco}</p>
+            <p><strong>👤 Cliente:</strong> ${dadosCliente.nome}</p>
+            <p><strong>📞 Telefone:</strong> ${dadosCliente.telefone || 'N/I'}</p>
+            <p><strong>📍 Endereço:</strong> ${enderecoCompleto}</p>
             <hr style="border-style: dashed;">
             <strong>ITENS DO PEDIDO:</strong><br>
             ${itensHtml}
             <hr style="border-style: dashed;">
             <p style="font-size: 16px; text-align: right;"><strong>TOTAL A RECEBER: R$ ${totalVendaGlobal.toFixed(2)}</strong></p>
-            <p style="text-align: center; margin-top: 10px; border: 1px solid #000; padding: 5px;">📦 ENTREGAR COM MOTOBOY</p>
+            <p style="text-align: center; margin-top: 10px; border: 1px solid #000; padding: 5px; font-weight: bold;">📦 LEVAR MAQUINETA / COBRAR NA ENTREGA</p>
         </div>
     `);
 
     // Reseta o estado do PDV e a variável de controle
     carrinho = [];
-    vendaPendenteEmEdicaoId = null; 
+    vendaPendenteEmEdicaoId = null;
     document.getElementById('pdv-cliente-id-selecionado').value = '';
     document.getElementById('pdv-busca-cliente').value = '';
     renderizarCarrinhoHTML();
     window.mostrarAlertaSistema("Pedido pendente salvo com sucesso! Comanda impressa.", "Sucesso");
 });
+
 
 // 2. BUSCAR COMPRA PENDENTE E EXIBIR MODAL
 document.getElementById('btn-consultar-pendentes').addEventListener('click', async () => {
