@@ -1,6 +1,6 @@
 *.sh
 node_modules/
-*.md
+tarefa.md
 *~
 *.save
 firebase*.js

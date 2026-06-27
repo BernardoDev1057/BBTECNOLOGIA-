@@ -21,6 +21,7 @@ export function renderizarMenuGlobal(paginaAtiva) {
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'contas' ? 'active fw-bold text-primary' : ''}" href="contas.html">Contas a Receber</a></li>
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'relatorios' ? 'active fw-bold text-primary' : ''}" href="relatorios.html">Relatórios</a></li>
                     <li class="nav-item"><a class="nav-link ${paginaAtiva === 'ajustes' ? 'active fw-bold text-primary' : ''}" href="ajustes.html">Ajustes Preços</a></li>
+                    <li class="nav-item"><a class="nav-link ${paginaAtiva === 'sobre' ? 'active fw-bold text-primary' : ''}" href="sobre.html">Sobre</a></li>
                 </ul>
                 <button id="btn-logout-global" class="btn btn-danger btn-sm fw-bold w-sm-100 mt-2 mt-lg-0">Sair (Logout)</button>
             </div>
