@@ -5,6 +5,17 @@ Todas as alterações importantes deste projeto serão documentadas neste arquiv
 
 O formato segue o padrão Keep a Changelog e utiliza Versionamento Semântico (SemVer).
 
+
+## [v1.0.1] - 2026-06-27
+
+### Alterações
+
+- docs: Atualizado o changelog.md e version.json para versoes corretas
+- release: v1.0.1
+- feat: cria central de informações do sistema
+
+---
+
 ---
 
 ## [v1.1.0] - 2026-06-27
