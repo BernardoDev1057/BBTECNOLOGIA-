@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP - Dashboard Gerencial</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .busca-item { padding: 8px 12px; cursor: pointer; background: white; border-bottom: 1px solid #eee; }
+        .busca-item:hover { background: #f8f9fa; }
+    </style>
 </head>
 <body class="bg-light">
-
     <div class="container py-3">
         <div id="menu-global-container"></div>
-
+        
         <div class="row mb-3">
             <div class="col">
                 <h2 class="fw-bold">Painel de Indicadores Gerenciais</h2>
@@ -80,10 +83,10 @@
             </div>
         </div>
 
-        <div class="row g-4">
-            <div class="col-12 col-lg-7">
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-6">
                 <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white fw-bold">🔥 Ranking de Produtos Mais Vendidos</div>
+                    <div class="card-header bg-white fw-bold py-3">🔥 Ranking de Produtos Mais Vendidos</div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover table-striped mb-0 align-middle">
@@ -98,23 +101,48 @@
                     </div>
                 </div>
             </div>
+            
+            <div class="col-12 col-lg-6">
+                <div class="card shadow-sm h-100 border-start border-info border-4">
+                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-middle py-3">
+                        <span>📦 Entregas Pendentes</span>
+                        <span class="badge bg-info text-dark" id="db-qtd-pendentes">0 pendentes</span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 350px; overflow-y: auto;">
+                        <ul class="list-group list-group-flush" id="lista-entregas-pendentes">
+                            <li class="list-group-item text-center text-muted py-4">Nenhuma entrega pendente.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            <div class="col-12 col-lg-5">
-                <div class="card bg-dark text-white shadow-sm h-100">
-                    <div class="card-body d-flex flex-column justify-content-between p-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card bg-dark text-white shadow-sm p-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
                         <div>
-                            <h4 class="fw-bold mb-3">Atalhos de Gestão</h4>
-                            <div class="d-grid gap-2">
-                                <a href="contas.html" class="btn btn-outline-light text-start p-3 border-start border-primary border-4 fw-bold">💳 Contas a Receber (Fiados)</a>
-                                <a href="relatorios.html" class="btn btn-outline-light text-start p-3 border-start border-warning border-4 fw-bold">📊 Relatórios e Auditorias</a>
-                            </div>
+                            <h4 class="fw-bold mb-1">Atalhos de Gestão Operacional</h4>
+                            <p class="text-secondary mb-3 mb-md-0 small">Navegue pelas telas fiscais e de crédito do sistema.</p>
                         </div>
-                        <div class="text-center mt-4 pt-4 border-top border-secondary">
-                            <p class="small text-secondary">Precisa realizar uma venda rápida ou gerenciar o turno de caixa?</p>
-                            <a href="caixa.html" class="btn btn-success btn-lg w-100 fw-bold shadow">IR PARA O PDV / CAIXA</a>
+                        <div class="d-flex gap-2">
+                            <a href="contas.html" class="btn btn-outline-light fw-bold">💳 Contas a Receber</a>
+                            <a href="relatorios.html" class="btn btn-outline-light fw-bold">📊 Relatórios</a>
+                            <a href="caixa.html" class="btn btn-success fw-bold px-4">IR PARA O PDV</a>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastPlacement">
+        <div id="liveToast" class="toast align-items-center text-white bg-dark border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-bold" id="toast-mensagem-conteudo">
+                    🔔 Atualização no banco de dados detectada!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
     </div>

@@ -17,13 +17,21 @@ function dispararNotificacaoToast(mensagem) {
 }
 
 function inicializarEscutasDashboard() {
-    // Escuta ativa em tempo real para a coleção de vendas
+    // Escuta ativa em tempo real para a coleção de vendas definitivas
     onValue(ref(db, 'vendas'), async () => {
         if (sistemaJaInicializado) {
             dispararNotificacaoToast("Movimentação de venda detetada no sistema!");
         }
         await processarMetricasDashboard();
         sistemaJaInicializado = true;
+    });
+
+    // Escuta ativa em tempo real para as vendas pendentes (Entregas na rua)
+    onValue(ref(db, 'vendas_pendentes'), async () => {
+        if (sistemaJaInicializado) {
+            dispararNotificacaoToast("Nova entrega ou pendência atualizada!");
+        }
+        await processarMetricasDashboard();
     });
 
     // Escuta para as demais coleções do sistema
@@ -45,14 +53,15 @@ async function processarMetricasDashboard() {
         const hojeStr = `${ano}-${mes}-${dia}`; // "YYYY-MM-DD"
         const anoMesStr = `${ano}-${mes}`;     // "YYYY-MM"
 
-        // Puxa todos os nós em paralelo para cruzamento de dados
-        const [prodSnap, venSnap, cxSnap, recSnap, supSnap, sanSnap] = await Promise.all([
+        // Puxa todos os nós em paralelo para cruzamento de dados (Incluindo vendas_pendentes)
+        const [prodSnap, venSnap, cxSnap, recSnap, supSnap, sanSnap, penSnap] = await Promise.all([
             get(ref(db, 'produtos')),
             get(ref(db, 'vendas')),
             get(ref(db, 'caixas')),
             get(ref(db, 'contasReceber')),
             get(ref(db, 'suprimentos')),
-            get(ref(db, 'sangrias'))
+            get(ref(db, 'sangrias')),
+            get(ref(db, 'vendas_pendentes')) // <-- Adicionado o nó correto das pendências
         ]);
 
         const produtosMap = prodSnap.exists() ? prodSnap.val() : {};
@@ -73,41 +82,41 @@ async function processarMetricasDashboard() {
         }
         setText('db-contas-receber', fmtMoney(totalContasReceber));
 
-        // 3. MÉTRICAS: FINANCEIRO, RANKING E CARD DE ENTREGAS
+        // 3. CARD DE ENTREGAS (Preenchido a partir do nó 'vendas_pendentes')
+        let totalVendasPendentes = 0;
+        const listaPendentesHTML = [];
+
+        if (penSnap.exists()) {
+            Object.values(penSnap.val()).forEach(v => {
+                if (!v) return;
+                totalVendasPendentes++;
+                
+                const nomeCliente = v.clienteNome || "Cliente Não Informado";
+                const enderecoCliente = v.enderecoEntrega || "Retirada/Sem Endereço";
+                const valorVendaPendente = v.total || 0;
+
+                listaPendentesHTML.push(`
+                    <li class="list-group-item d-flex justify-content-between align-items-start py-2 fs-6">
+                        <div class="ms-2 me-auto text-truncate" style="max-width: 75%;">
+                            <div class="fw-bold text-dark">${nomeCliente}</div>
+                            <span class="text-muted small">${enderecoCliente}</span>
+                        </div>
+                        <span class="badge bg-warning text-dark rounded-pill fw-bold">${fmtMoney(valorVendaPendente)}</span>
+                    </li>
+                `);
+            });
+        }
+
+        // 4. MÉTRICAS FINANCEIRAS E RANKING (Apenas vendas consolidadas)
         let faturamentoHoje = 0;
         let faturamentoMes = 0;
         let totalLucro = 0;
         let qtdVendasHoje = 0;
-        let totalVendasPendentes = 0;
-        
         const rankingProdutos = {};
-        const listaPendentesHTML = [];
 
         if (venSnap.exists()) {
             Object.values(venSnap.val()).forEach(v => {
                 if (!v || v.cancelado === true || v.ativo === false) return;
-
-                const statusVenda = String(v.status || '').toLowerCase();
-
-                // REQUISITO: Se estiver PENDENTE, isola no card de entregas
-                if (statusVenda === 'pendente') {
-                    totalVendasPendentes++;
-                    
-                    const nomeCliente = v.clienteNome || (v.cliente && v.cliente.nome) || "Cliente Não Informado";
-                    const enderecoCliente = v.enderecoEntrega || (v.cliente && v.cliente.endereco) || "Retirada/Sem Endereço";
-                    const valorVendaPendente = v.total || 0;
-
-                    listaPendentesHTML.push(`
-                        <li class="list-group-item d-flex justify-content-between align-items-start py-2 fs-6">
-                            <div class="ms-2 me-auto text-truncate" style="max-width: 75%;">
-                                <div class="fw-bold text-dark">${nomeCliente}</div>
-                                <span class="text-muted small">${enderecoCliente}</span>
-                            </div>
-                            <span class="badge bg-warning text-dark rounded-pill fw-bold">${fmtMoney(valorVendaPendente)}</span>
-                        </li>
-                    `);
-                    return; 
-                }
 
                 // Extração segura da data ("YYYY-MM-DD")
                 const dataVendaStr = v.dataHora ? v.dataHora.split('T')[0] : "";
@@ -121,7 +130,7 @@ async function processarMetricasDashboard() {
                     faturamentoMes += (v.total || 0);
                 }
 
-                // Mapeia tanto 'itens' (banco real) quanto 'items' para segurança
+                // Mapeia tanto 'itens' quanto 'items' para segurança
                 const itensBrutos = v.itens || v.items;
                 if (itensBrutos) {
                     const itensArray = Array.isArray(itensBrutos) ? itensBrutos : Object.values(itensBrutos);
@@ -148,7 +157,7 @@ async function processarMetricasDashboard() {
         setText('db-lucro', fmtMoney(totalLucro));
         setText('db-ticket', fmtMoney(qtdVendasHoje > 0 ? (faturamentoHoje / qtdVendasHoje) : 0));
 
-        // Renderiza a lista de Entregas Pendentes
+        // Renderiza a lista de Entregas Pendentes na interface
         setText('db-qtd-pendentes', `${totalVendasPendentes} pendentes`);
         const containerListaPendentes = $('lista-entregas-pendentes');
         if (containerListaPendentes) {
@@ -171,24 +180,22 @@ async function processarMetricasDashboard() {
             }
         }
 
-        // 4. DINHEIRO NO CAIXA ATUAL (Consolida TODOS os caixas abertos no momento)
+        // 5. DINHEIRO NO CAIXA ATUAL (Consolida TODOS os caixas abertos no momento)
         let saldoDinheiroCaixa = 0;
         let temCaixaAberto = false;
 
         if (cxSnap.exists()) {
             const caixasAbertosIds = [];
 
-            // Identifica todos os caixas que estão ativos ("Aberto") de qualquer pessoa
             Object.entries(cxSnap.val()).forEach(([id, cx]) => {
                 if (cx.status === 'Aberto') {
                     temCaixaAberto = true;
                     caixasAbertosIds.push(id);
-                    saldoDinheiroCaixa += (cx.valorInicial || 0); // Soma o fundo de caixa de todos
+                    saldoDinheiroCaixa += (cx.valorInicial || 0);
                 }
             });
 
             if (temCaixaAberto) {
-                // Soma as vendas físicas em dinheiro que entraram nesses caixas ativos
                 if (venSnap.exists()) {
                     Object.values(venSnap.val()).forEach(v => {
                         if (!v || String(v.status).toLowerCase() === 'pendente' || v.cancelado === true || v.ativo === false) return;
@@ -203,14 +210,12 @@ async function processarMetricasDashboard() {
                     });
                 }
 
-                // Soma os Suprimentos associados aos caixas abertos
                 if (supSnap.exists()) {
                     Object.values(supSnap.val()).forEach(s => { 
                         if (caixasAbertosIds.includes(s.caixaId)) saldoDinheiroCaixa += (s.valor || 0); 
                     });
                 }
 
-                // Subtrai as Sangrias associadas aos caixas abertos
                 if (sanSnap.exists()) {
                     Object.values(sanSnap.val()).forEach(s => { 
                         if (caixasAbertosIds.includes(s.caixaId)) saldoDinheiroCaixa -= (s.valor || 0); 
@@ -235,3 +240,4 @@ onAuthStateChanged(auth, (user) => {
         console.warn("Usuário não autenticado detetado no escopo do Dashboard.");
     }
 });
+
