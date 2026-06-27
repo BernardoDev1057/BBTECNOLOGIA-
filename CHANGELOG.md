@@ -1,6 +1,9 @@
 # Changelog
 
-## [v1.1.0] - 2026-06-27
+## [v1.0.1] - 2026-06-27
+
+- feat: cria central de informações do sistema
+
 
 - feat: cria central de informações do sistema
 
