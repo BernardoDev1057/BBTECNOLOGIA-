@@ -8,6 +8,8 @@ let caixaAtivoId = null;
 let valorInicialTroco = 0;
 let carrinho = [];
 let totalVendaGlobal = 0;
+// Variável global para rastrear se o carrinho veio de uma venda pendente recuperada
+let vendaPendenteEmEdicaoId = null;
 
 // Referência rápida de elementos
 const telaAbertura = document.getElementById('tela-abertura');
@@ -198,7 +200,7 @@ document.getElementById('pdv-busca-produto').addEventListener('input', (e) => {
             if(filtrados++ >= 5) return;
             const item = document.createElement('div');
             item.className = 'busca-item';
-            item.textContent = `${p.codigoBarras} - ${p.descricao} (Estoque: ${p.estoque})`;
+            item.textContent = `${p.codigoBarras} - ${p.descricao} (R$: ${p.valorVenda})`;
             item.addEventListener('click', () => {
                 document.getElementById('pdv-busca-produto').value = p.descricao;
                 produtoSelecionadoId = id;
@@ -414,6 +416,13 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
         dataHora: new Date().toISOString()
     });
 
+// Cole estas linhas no fluxo de sucesso do fechamento normal da venda (F10):
+if (vendaPendenteEmEdicaoId) {
+    await remove(ref(db, `vendas_pendentes/${vendaPendenteEmEdicaoId}`));
+    vendaPendenteEmEdicaoId = null;
+}
+
+
     // Impressão do Cupom
     let itensHtml = carrinho.map(item => `
         <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
@@ -465,3 +474,166 @@ document.getElementById('btn-finalizar-venda').addEventListener('click', async (
     renderizarCarrinhoHTML();
     window.mostrarAlertaSistema("Venda finalizada com sucesso!", "Sucesso");
 });
+// ==========================================
+// CONTROLADOR DE VENDAS PENDENTES CORRIGIDO
+// ==========================================
+
+// 1. SALVAR OU ATUALIZAR A VENDA COMO PENDENTE E GERAR COMANDA
+document.getElementById('btn-pendente-venda').addEventListener('click', async () => {
+    if (carrinho.length === 0) return window.mostrarAlertaSistema("Carrinho vazio!", "Aviso");
+    
+    const clienteId = document.getElementById('pdv-cliente-id-selecionado').value;
+    if (!clienteId) {
+        return window.mostrarAlertaSistema("Selecione um cliente para registrar a entrega pendente!", "Atenção");
+    }
+
+    const dadosCliente = listaClientesMemoria[clienteId];
+    
+    const vendaPendente = {
+        caixaId: caixaAtivoId,
+        operador: auth.currentUser.email,
+        clienteId: clienteId,
+        clienteNome: dadosCliente.nome,
+        items: carrinho,
+        total: parseFloat(totalVendaGlobal.toFixed(2)),
+        status: 'Pendente',
+        dataHora: new Date().toISOString()
+    };
+
+    // CORREÇÃO DA DUPLICAÇÃO: Verifica se já era uma pendência sendo reconfigurada/editada
+    if (vendaPendenteEmEdicaoId) {
+        await set(ref(db, `vendas_pendentes/${vendaPendenteEmEdicaoId}`), vendaPendente);
+    } else {
+        const novaPendenciaRef = push(ref(db, 'vendas_pendentes'));
+        await set(novaPendenciaRef, vendaPendente);
+    }
+
+    // Impressão da Comanda de Entrega para o Motoboy
+    let itensHtml = carrinho.map(item => `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+            <span>${item.quantidade}x ${item.descricao}</span>
+            <span>R$ ${item.subtotal.toFixed(2)}</span>
+        </div>
+    `).join('');
+
+    const endereco = `${dadosCliente.rua || 'Não informado'}, ${dadosCliente.bairro || ''}`;
+
+    imprimirComprovante("COMANDA DE ENTREGA (PENDENTE)", `
+        <div style="font-size: 14px; font-family: monospace;">
+            <p><strong>Cliente:</strong> ${dadosCliente.nome}</p>
+            <p><strong>Telefone:</strong> ${dadosCliente.telefone || 'N/I'}</p>
+            <p><strong>Endereço:</strong> ${endereco}</p>
+            <hr style="border-style: dashed;">
+            <strong>ITENS DO PEDIDO:</strong><br>
+            ${itensHtml}
+            <hr style="border-style: dashed;">
+            <p style="font-size: 16px; text-align: right;"><strong>TOTAL A RECEBER: R$ ${totalVendaGlobal.toFixed(2)}</strong></p>
+            <p style="text-align: center; margin-top: 10px; border: 1px solid #000; padding: 5px;">📦 ENTREGAR COM MOTOBOY</p>
+        </div>
+    `);
+
+    // Reseta o estado do PDV e a variável de controle
+    carrinho = [];
+    vendaPendenteEmEdicaoId = null; 
+    document.getElementById('pdv-cliente-id-selecionado').value = '';
+    document.getElementById('pdv-busca-cliente').value = '';
+    renderizarCarrinhoHTML();
+    window.mostrarAlertaSistema("Pedido pendente salvo com sucesso! Comanda impressa.", "Sucesso");
+});
+
+// 2. BUSCAR COMPRA PENDENTE E EXIBIR MODAL
+document.getElementById('btn-consultar-pendentes').addEventListener('click', async () => {
+    let modal = document.getElementById('modal-lista-pendentes');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modal-lista-pendentes';
+        modal.className = 'modal fade';
+        modal.tabIndex = -1;
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title fw-bold">⏳ Entregas / Vendas Pendentes</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Cliente</th>
+                                    <th>Data/Hora</th>
+                                    <th>Itens</th>
+                                    <th>Total</th>
+                                    <th>Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpo-tabela-pendentes"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+    }
+
+    const tbody = document.getElementById('corpo-tabela-pendentes');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Carregando pendências...</td></tr>';
+
+    const bsModal = bootstrap.Modal.getOrCreateInstance(modal);
+    bsModal.show();
+
+    const snapshot = await get(ref(db, 'vendas_pendentes'));
+    tbody.innerHTML = '';
+
+    if (!snapshot.exists()) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma venda pendente na rua.</td></tr>';
+        return;
+    }
+
+    snapshot.forEach((childSnapshot) => {
+        const idKey = childSnapshot.key;
+        const v = childSnapshot.val();
+        const dataFmt = new Date(v.dataHora).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${v.clienteNome}</strong></td>
+            <td>${dataFmt}</td>
+            <td>${v.items.length} item(ns)</td>
+            <td class="fw-bold text-danger">R$ ${v.total.toFixed(2)}</td>
+            <td>
+                <button class="btn btn-sm btn-success fw-bold" onclick="recuperarPendenciaParaOFluxo('${idKey}')">
+                    ⚡ Trazer p/ Caixa
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+});
+
+// 3. RECUPERAR A PENDÊNCIA E FECHAR O MODAL CORRETAMENTE
+window.recuperarPendenciaParaOFluxo = async (pendenciaId) => {
+    const snap = await get(ref(db, `vendas_pendentes/${pendenciaId}`));
+    if (snap.exists()) {
+        const dados = snap.val();
+
+        // Carrega os dados no carrinho e identifica o cliente
+        carrinho = dados.items;
+        document.getElementById('pdv-cliente-id-selecionado').value = dados.clienteId;
+        document.getElementById('pdv-busca-cliente').value = dados.clienteNome;
+        
+        // Define o ID em edição para impedir duplicação ao clicar em "Pendente" novamente
+        vendaPendenteEmEdicaoId = pendenciaId;
+
+        renderizarCarrinhoHTML();
+
+        // CORREÇÃO DO MODAL: Fecha o modal limpando as instâncias corretamente
+        const modalEl = document.getElementById('modal-lista-pendentes');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+
+        window.mostrarAlertaSistema("Pedido carregado! Para finalizar, adicione o pagamento e pressione F10.", "Sucesso");
+    }
+};
+
