@@ -17,7 +17,8 @@
         <div id="menu-global-container"></div>
 
         <div id="barra-auxiliar-caixa" class="mb-3 text-end" style="display:none;">
-            <button class="btn btn-secondary fw-bold btn-sm me-2" id="nav-btn-sangria">💸 Sangria / Suprimento</button>
+<button class="btn btn-secondary fw-bold btn-sm me-2" id="nav-btn-sangria" data-bs-toggle="modal" data-bs-target="#modal-sangria">💸 Sangria / Suprimento</button>
+
             <button class="btn btn-danger btn-sm fw-bold" id="nav-btn-fechar">🔒 Fechar Caixa</button>
         </div>
 
@@ -171,7 +172,9 @@
     // Inicializa os modais do Bootstrap apenas uma vez
     window.modalSangria = new bootstrap.Modal(document.getElementById('modal-sangria'));
     window.modalFechamento = new bootstrap.Modal(document.getElementById('modal-fechamento'));
-
+	window.toggleBarraCaixa = (mostrar) => {
+        document.getElementById('barra-auxiliar-caixa').style.display = mostrar ? 'block' : 'none';
+    };
     // Função para ser chamada pelo caixa.js para mostrar/esconder a barra
     window.toggleBarraCaixa = (mostrar) => {
         document.getElementById('barra-auxiliar-caixa').style.display = mostrar ? 'block' : 'none';
