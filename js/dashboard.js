@@ -1,164 +1,237 @@
-import { db, auth, ref, get } from './firebase-config.js';
-import { $, setText, fmtMoney, isoDate } from './utils.js';
+// js/dashboard.js
+import { db, auth, ref, get, onValue, onAuthStateChanged } from './firebase-config.js';
+import { $, setText, fmtMoney } from './utils.js';
 
-async function processarMétricasDashboard() {
-    if (!auth.currentUser) return;
+let bootstrapToastInstance = null;
+let sistemaJaInicializado = false;
 
-    // Pega as datas de controle baseadas no fuso local do dispositivo
-    const agora = new Date();
-    const hojeStr = isoDate(agora); // Formato "YYYY-MM-DD"
-    const anoMesStr = hojeStr.substring(0, 7); // Formato "YYYY-MM"
-
-    // 1. Busca tabelas chaves em paralelo para performance
-    const [prodSnap, venSnap, cxSnap, recSnap] = await Promise.all([
-        get(ref(db, 'produtos')),
-        get(ref(db, 'vendas')),
-        get(ref(db, 'caixas')),
-        get(ref(db, 'contasReceber'))
-    ]);
-
-    // Bancos locais para cruzamento de dados de custo/lucro
-    const produtosMap = prodSnap.exists() ? prodSnap.val() : {};
-    
-    // ==========================================
-    // MÉTRICA A: PRODUTOS COM ESTOQUE BAIXO
-    // ==========================================
-    let contagemEstoqueBaixo = 0;
-    Object.values(produtosMap).forEach(p => {
-        if ((p.estoque || 0) <= 10) contagemEstoqueBaixo++;
-    });
-    setText('db-estoque-baixo', contagemEstoqueBaixo);
-
-    // ==========================================
-    // MÉTRICA B: CONTAS A RECEBER (CRÉDITO LOJA)
-    // ==========================================
-    let totalContasReceber = 0;
-    if (recSnap.exists()) {
-        Object.values(recSnap.val()).forEach(r => {
-            if (r.status === 'Aberto') totalContasReceber += r.valor;
-        });
+function dispararNotificacaoToast(mensagem) {
+    const toastEl = $('liveToast');
+    if (!toastEl) return;
+    if (!bootstrapToastInstance && window.bootstrap) {
+        bootstrapToastInstance = new window.bootstrap.Toast(toastEl);
     }
-    setText('db-contas-receber', fmtMoney(totalContasReceber));
+    const msgCorpo = $('toast-mensagem-conteudo');
+    if (msgCorpo) msgCorpo.innerHTML = `🔔 ${mensagem}`;
+    if (bootstrapToastInstance) bootstrapToastInstance.show();
+}
 
-    // ==========================================
-    // MÉTRICAS C: VENDAS, LUCRO, TICKET MÉDIO e RANKING
-    // ==========================================
-    let faturamentoHoje = 0;
-    let faturamentoMes = 0;
-    let totalLucro = 0;
-    let qtdVendasHoje = 0;
-    const rankingProdutos = {}; // Dicionário para contar saída de itens
-
-    if (venSnap.exists()) {
-        Object.values(venSnap.val()).forEach(v => {
-            const dataVendaStr = v.dataHora.split('T')[0];
-            const anoMesVendaStr = dataVendaStr.substring(0, 7);
-
-            // Filtro Diário
-            if (dataVendaStr === hojeStr) {
-                faturamentoHoje += v.total;
-                qtdVendasHoje++;
-            }
-
-            // Filtro Mensal
-            if (anoMesVendaStr === anoMesStr) {
-                faturamentoMes += v.total;
-            }
-
-            // Cálculo de Margem e Lucro Real (Preço Venda - Preço Custo) de cada item vendido
-            if (v.items && Array.isArray(v.items)) {
-                v.items.forEach(item => {
-                    // Contagem para o Ranking
-                    rankingProdutos[item.descricao] = (rankingProdutos[item.descricao] || 0) + item.quantidade;
-
-                    // Lucro do item
-                    const dadosOriginaisProduto = produtosMap[item.id];
-                    if (dadosOriginaisProduto) {
-                        const custoUnitario = dadosOriginaisProduto.valorCusto || 0;
-                        const lucroUnitario = item.precoUnitario - custoUnitario;
-                        totalLucro += (lucroUnitario * item.quantidade);
-                    }
-                });
-            }
-        });
-    }
-
-    const ticketMedio = qtdVendasHoje > 0 ? (faturamentoHoje / qtdVendasHoje) : 0;
-
-    setText('db-vendas-hoje', fmtMoney(faturamentoHoje));
-    setText('db-vendas-mes', fmtMoney(faturamentoMes));
-    setText('db-lucro', fmtMoney(totalLucro));
-    setText('db-ticket', fmtMoney(ticketMedio));
-
-    // RENDERIZAR TABELA DE MAIS VENDIDOS (TOP 5)
-    const tabelaRanking = $('tabela-mais-vendidos');
-    tabelaRanking.innerHTML = '';
-    
-    const produtosOrdenados = Object.entries(rankingProdutos)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
-
-    if (produtosOrdenados.length === 0) {
-        tabelaRanking.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #999;">Nenhuma venda registrada no mês.</td></tr>`;
-    } else {
-        produtosOrdenados.forEach(([descricao, qtd], index) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><b>${index + 1}º</b></td>
-                <td>${descricao}</td>
-                <td>${qtd} unidades</td>
-            `;
-            tabelaRanking.appendChild(tr);
-        });
-    }
-
-    // ==========================================
-    // MÉTRICA D: DINHEIRO VIVO NO CAIXA ATUAL
-    // ==========================================
-    let saldoDinheiroCaixa = 0;
-    if (cxSnap.exists()) {
-        // Encontra o caixa do operador logado que está aberto
-        let caixaAtivoId = null;
-        let valorInicial = 0;
-
-        Object.entries(cxSnap.val()).forEach(([id, cx]) => {
-            if (cx.operador === auth.currentUser.email && cx.status === 'Aberto') {
-                caixaAtivoId = id;
-                valorInicial = cx.valorInicial || 0;
-            }
-        });
-
-        if (caixaAtivoId) {
-            saldoDinheiroCaixa = valorInicial;
-
-            // Soma vendas em dinheiro deste caixa específico
-            if (venSnap.exists()) {
-                Object.values(venSnap.val()).forEach(v => {
-                    if (v.caixaId === caixaAtivoId && v.formaPagamento === 'Dinheiro') {
-                        saldoDinheiroCaixa += v.total;
-                    }
-                });
-            }
-
-            // Soma suprimentos e abate sangrias por requests adicionais rápidos
-            const [supSnap, sanSnap] = await Promise.all([
-                get(ref(db, 'suprimentos')),
-                get(ref(db, 'sangrias'))
-            ]);
-
-            if (supSnap.exists()) {
-                Object.values(supSnap.val()).forEach(s => { if (s.caixaId === caixaAtivoId) saldoDinheiroCaixa += s.valor; });
-            }
-            if (sanSnap.exists()) {
-                Object.values(sanSnap.val()).forEach(s => { if (s.caixaId === caixaAtivoId) saldoDinheiroCaixa -= s.valor; });
-            }
-            setText('db-caixa-atual', fmtMoney(saldoDinheiroCaixa));
-        } else {
-            setText('db-caixa-atual', "Caixa Fechado");
+function inicializarEscutasDashboard() {
+    // Escuta ativa em tempo real para a coleção de vendas
+    onValue(ref(db, 'vendas'), async () => {
+        if (sistemaJaInicializado) {
+            dispararNotificacaoToast("Movimentação de venda detetada no sistema!");
         }
+        await processarMetricasDashboard();
+        sistemaJaInicializado = true;
+    });
+
+    // Escuta para as demais coleções do sistema
+    ['produtos', 'caixas', 'contasReceber'].forEach(tabela => {
+        onValue(ref(db, tabela), () => {
+            if (sistemaJaInicializado) dispararNotificacaoToast(`Dados de [${tabela.toUpperCase()}] atualizados.`);
+            processarMetricasDashboard();
+        });
+    });
+}
+
+async function processarMetricasDashboard() {
+    try {
+        const agora = new Date();
+        const ano = agora.getFullYear();
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const dia = String(agora.getDate()).padStart(2, '0');
+        
+        const hojeStr = `${ano}-${mes}-${dia}`; // "YYYY-MM-DD"
+        const anoMesStr = `${ano}-${mes}`;     // "YYYY-MM"
+
+        // Puxa todos os nós em paralelo para cruzamento de dados
+        const [prodSnap, venSnap, cxSnap, recSnap, supSnap, sanSnap] = await Promise.all([
+            get(ref(db, 'produtos')),
+            get(ref(db, 'vendas')),
+            get(ref(db, 'caixas')),
+            get(ref(db, 'contasReceber')),
+            get(ref(db, 'suprimentos')),
+            get(ref(db, 'sangrias'))
+        ]);
+
+        const produtosMap = prodSnap.exists() ? prodSnap.val() : {};
+
+        // 1. MÉTRICA: ALERTA DE ESTOQUE BAIXO (Limite <= 10)
+        let contagemEstoqueBaixo = 0;
+        Object.values(produtosMap).forEach(p => {
+            if ((p.estoque || 0) <= 10) contagemEstoqueBaixo++;
+        });
+        setText('db-estoque-baixo', contagemEstoqueBaixo);
+
+        // 2. MÉTRICA: CONTAS A RECEBER
+        let totalContasReceber = 0;
+        if (recSnap.exists()) {
+            Object.values(recSnap.val()).forEach(r => {
+                if (r.status === 'Aberto') totalContasReceber += (r.valor || 0);
+            });
+        }
+        setText('db-contas-receber', fmtMoney(totalContasReceber));
+
+        // 3. MÉTRICAS: FINANCEIRO, RANKING E CARD DE ENTREGAS
+        let faturamentoHoje = 0;
+        let faturamentoMes = 0;
+        let totalLucro = 0;
+        let qtdVendasHoje = 0;
+        let totalVendasPendentes = 0;
+        
+        const rankingProdutos = {};
+        const listaPendentesHTML = [];
+
+        if (venSnap.exists()) {
+            Object.values(venSnap.val()).forEach(v => {
+                if (!v || v.cancelado === true || v.ativo === false) return;
+
+                const statusVenda = String(v.status || '').toLowerCase();
+
+                // REQUISITO: Se estiver PENDENTE, isola no card de entregas
+                if (statusVenda === 'pendente') {
+                    totalVendasPendentes++;
+                    
+                    const nomeCliente = v.clienteNome || (v.cliente && v.cliente.nome) || "Cliente Não Informado";
+                    const enderecoCliente = v.enderecoEntrega || (v.cliente && v.cliente.endereco) || "Retirada/Sem Endereço";
+                    const valorVendaPendente = v.total || 0;
+
+                    listaPendentesHTML.push(`
+                        <li class="list-group-item d-flex justify-content-between align-items-start py-2 fs-6">
+                            <div class="ms-2 me-auto text-truncate" style="max-width: 75%;">
+                                <div class="fw-bold text-dark">${nomeCliente}</div>
+                                <span class="text-muted small">${enderecoCliente}</span>
+                            </div>
+                            <span class="badge bg-warning text-dark rounded-pill fw-bold">${fmtMoney(valorVendaPendente)}</span>
+                        </li>
+                    `);
+                    return; 
+                }
+
+                // Extração segura da data ("YYYY-MM-DD")
+                const dataVendaStr = v.dataHora ? v.dataHora.split('T')[0] : "";
+                const anoMesVendaStr = dataVendaStr.substring(0, 7);
+
+                if (dataVendaStr === hojeStr) {
+                    faturamentoHoje += (v.total || 0);
+                    qtdVendasHoje++;
+                }
+                if (anoMesVendaStr === anoMesStr) {
+                    faturamentoMes += (v.total || 0);
+                }
+
+                // Mapeia tanto 'itens' (banco real) quanto 'items' para segurança
+                const itensBrutos = v.itens || v.items;
+                if (itensBrutos) {
+                    const itensArray = Array.isArray(itensBrutos) ? itensBrutos : Object.values(itensBrutos);
+                    itensArray.forEach(item => {
+                        if (!item) return;
+                        const desc = item.descricao || "Produto Sem Nome";
+                        rankingProdutos[desc] = (rankingProdutos[desc] || 0) + (item.quantidade || 0);
+                        
+                        const pId = item.produtoId || item.id;
+                        const dadosOriginaisProduto = produtosMap[pId];
+                        if (dadosOriginaisProduto) {
+                            const custoUnitario = dadosOriginaisProduto.valorCusto || 0;
+                            const precoVendaItem = item.precoUnitario || 0;
+                            totalLucro += ((precoVendaItem - custoUnitario) * (item.quantidade || 0));
+                        }
+                    });
+                }
+            });
+        }
+
+        // Atualização visual dos cards principais
+        setText('db-vendas-hoje', fmtMoney(faturamentoHoje));
+        setText('db-vendas-mes', fmtMoney(faturamentoMes));
+        setText('db-lucro', fmtMoney(totalLucro));
+        setText('db-ticket', fmtMoney(qtdVendasHoje > 0 ? (faturamentoHoje / qtdVendasHoje) : 0));
+
+        // Renderiza a lista de Entregas Pendentes
+        setText('db-qtd-pendentes', `${totalVendasPendentes} pendentes`);
+        const containerListaPendentes = $('lista-entregas-pendentes');
+        if (containerListaPendentes) {
+            containerListaPendentes.innerHTML = listaPendentesHTML.length === 0 
+                ? `<li class="list-group-item text-center text-muted py-4">Nenhuma entrega pendente encontrada.</li>`
+                : listaPendentesHTML.join('');
+        }
+
+        // Renderiza a tabela de Ranking de Produtos (Top 5)
+        const tabelaRanking = $('tabela-mais-vendidos');
+        if (tabelaRanking) {
+            tabelaRanking.innerHTML = '';
+            const produtosOrdenados = Object.entries(rankingProdutos).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            if (produtosOrdenados.length === 0) {
+                tabelaRanking.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">Nenhuma venda registrada este mês.</td></tr>`;
+            } else {
+                produtosOrdenados.forEach(([descricao, qtd], index) => {
+                    tabelaRanking.innerHTML += `<tr><td><b>${index + 1}º</b></td><td>${descricao}</td><td>${qtd} un</td></tr>`;
+                });
+            }
+        }
+
+        // 4. DINHEIRO NO CAIXA ATUAL (Consolida TODOS os caixas abertos no momento)
+        let saldoDinheiroCaixa = 0;
+        let temCaixaAberto = false;
+
+        if (cxSnap.exists()) {
+            const caixasAbertosIds = [];
+
+            // Identifica todos os caixas que estão ativos ("Aberto") de qualquer pessoa
+            Object.entries(cxSnap.val()).forEach(([id, cx]) => {
+                if (cx.status === 'Aberto') {
+                    temCaixaAberto = true;
+                    caixasAbertosIds.push(id);
+                    saldoDinheiroCaixa += (cx.valorInicial || 0); // Soma o fundo de caixa de todos
+                }
+            });
+
+            if (temCaixaAberto) {
+                // Soma as vendas físicas em dinheiro que entraram nesses caixas ativos
+                if (venSnap.exists()) {
+                    Object.values(venSnap.val()).forEach(v => {
+                        if (!v || String(v.status).toLowerCase() === 'pendente' || v.cancelado === true || v.ativo === false) return;
+                        
+                        if (caixasAbertosIds.includes(v.caixaId)) {
+                            if (v.formaPagamento === 'Dinheiro') {
+                                saldoDinheiroCaixa += (v.total || 0);
+                            } else if (v.pagamento && (v.pagamento.dinheiro || v.pagamento.Dinheiro)) {
+                                saldoDinheiroCaixa += (v.pagamento.dinheiro || v.pagamento.Dinheiro || 0);
+                            }
+                        }
+                    });
+                }
+
+                // Soma os Suprimentos associados aos caixas abertos
+                if (supSnap.exists()) {
+                    Object.values(supSnap.val()).forEach(s => { 
+                        if (caixasAbertosIds.includes(s.caixaId)) saldoDinheiroCaixa += (s.valor || 0); 
+                    });
+                }
+
+                // Subtrai as Sangrias associadas aos caixas abertos
+                if (sanSnap.exists()) {
+                    Object.values(sanSnap.val()).forEach(s => { 
+                        if (caixasAbertosIds.includes(s.caixaId)) saldoDinheiroCaixa -= (s.valor || 0); 
+                    });
+                }
+
+                setText('db-caixa-atual', fmtMoney(saldoDinheiroCaixa));
+            } else {
+                setText('db-caixa-atual', "Nenhum Caixa Aberto");
+            }
+        }
+    } catch (erro) {
+        console.error("Erro crítico ao renderizar métricas:", erro);
     }
 }
 
-// Inicializa a escuta assim que o auth carregar o token do cookie de sessão local
-setTimeout(processarMétricasDashboard, 1500);
-
+// Inicializa com segurança ao confirmar autenticação ativa
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        inicializarEscutasDashboard();
+    } else {
+        console.warn("Usuário não autenticado detetado no escopo do Dashboard.");
+    }
+});
