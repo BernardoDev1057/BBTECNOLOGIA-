@@ -5,6 +5,28 @@ Todas as alterações importantes deste projeto serão documentadas neste arquiv
 
 O formato segue o padrão Keep a Changelog e utiliza Versionamento Semântico (SemVer).
 
+
+## [1.3.0] - 2026-06-28
+
+### 🚀 Adicionado
+- Modal unificado para cadastro de produtos
+- Movimentação de estoque (entrada e saída)
+- Análise de produto com gráfico Chart.js
+- Impressão de etiquetas personalizadas
+- Módulo `impressora.js` com função Etiqueta()
+- Integração com vendas para cálculo de consumo real
+
+### 🔧 Corrigido
+- Correção no carregamento de itens da tabela vendas (itens[])
+- Correção de inconsistência entre idProduto / produtoId / id
+- Correção no fluxo de edição de produto
+- Preenchimento seguro de campos no modal
+
+### 📊 Melhorado
+- Visual do ERP mais próximo de sistema comercial real
+- Melhor rastreabilidade de estoque vs vendas
+- Melhor UX no modal de operações
+
 ## [v1.2.0] - 2026-06-27
 
 ### ✨ Novidades
