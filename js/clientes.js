@@ -1,5 +1,5 @@
 import { db, ref, push, set, get, update } from './firebase-config.js';
-import { dispararMensagemWhatsApp } from './whatsapp.js';
+import { dispararMensagemWhatsApp, enviarMensagemCobranca} from './whatsapp.js';
 import { imprimirComprovante } from './impressora.js';
 import { $, formatCPF, formatPhone, sanitizeDigits, parseFloatSafe, fmtMoney, fmtDateBR } from './utils.js';
 
@@ -88,7 +88,16 @@ async function renderizarTabelaClientes() {
             b.addEventListener('click', () => carregarClienteParaEdicao(b.getAttribute('data-id')))
         );
         document.querySelectorAll('.btn-zap').forEach(b =>
-            b.addEventListener('click', () => enviarMensagemCobranca(b.getAttribute('data-id')))
+            b.addEventListener('click', async () => {
+                const id = b.getAttribute('data-id');
+                const snap = await get(ref(db, 'clientes/' + id));
+
+                if (!snap.exists()) return;
+
+                const cliente = snap.val();
+
+                enviarMensagemCobranca(cliente, cliente.saldoDevedor || 0);
+            })
         );
         document.querySelectorAll('.btn-extrato').forEach(b =>
             b.addEventListener('click', () => abrirExtratoCliente(b.getAttribute('data-id'), b.getAttribute('data-nome')))
@@ -192,24 +201,6 @@ async function carregarClienteParaEdicao(id) {
         formTitulo.innerText = 'Editando: ' + c.nome;
         btnCancelar.style.display = 'inline-block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-}
-
-async function enviarMensagemCobranca(id) {
-    const s = await get(ref(db, 'clientes/' + id));
-    if (s.exists()) {
-        const c = s.val();
-        const nome = c.nome;
-        const saldoDevedor = parseFloatSafe(c.saldoDevedor);
-        const limiteTotal = parseFloatSafe(c.limiteCredito);
-        const limiteDisponivel = Math.max(0, limiteTotal - saldoDevedor);
-
-        const textoMensagem = `Sr(a). ${nome},\n\n` +
-            `📌 *Saldo em aberto:* ${fmtMoney(saldoDevedor)}\n` +
-            `Para liquidação imediata via PIX ou pagamento em espécie, responda esta mensagem. Nossa equipe realizará a baixa na sua conta com total discrição.\n\n` +
-            `Atenciosamente,`;
-
-        dispararMensagemWhatsApp(c.telefone, textoMensagem);
     }
 }
 

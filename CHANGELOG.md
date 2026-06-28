@@ -5,6 +5,39 @@ Todas as alterações importantes deste projeto serão documentadas neste arquiv
 
 O formato segue o padrão Keep a Changelog e utiliza Versionamento Semântico (SemVer).
 
+## [v1.2.0] - 2026-06-27
+
+### ✨ Novidades
+- Integração do envio de cobrança via WhatsApp diretamente pelo cadastro de clientes
+- Adição de modal de envio de cupom/cobrança via WhatsApp com validação de telefone
+- Implementação de fluxo seguro para abertura do WhatsApp com dados do cliente
+
+### 🧾 Fluxo de Caixa
+- Melhorias no controle de abertura e fechamento de caixa
+- Cálculo mais preciso do valor esperado (vendas + suprimentos - sangrias + troco inicial)
+- Registro de fechamento com diferença e justificativa
+- Recarregamento automático e seguro após fechamento do caixa
+
+### 💰 Vendas (PDV)
+- Correção de erros no carrinho de compras (undefined e renderização)
+- Ajuste no cálculo de total da venda em tempo real
+- Melhoria no fluxo de pagamento com múltiplas formas (dinheiro, PIX, cartão, fiado)
+- Correção no sistema de recuperação de vendas pendentes
+- Estabilização do modal de recebimento
+
+### 📦 Integrações
+- Firebase: ajustes em leitura e atualização de vendas, clientes e caixa
+- WhatsApp: padronização e correção da função de envio de mensagens
+
+### 🐛 Correções
+- Corrigido erro de `forEach` em carrinho vazio ou undefined
+- Corrigido erro de `value undefined` em pagamentos
+- Corrigido erro ao recuperar vendas pendentes
+- Evitado crash ao renderizar carrinho sem itens
+
+### 📌 Observações
+- Sistema de PDV e caixa mais estável e preparado para operação contínua
+
 
 ## [v1.0.2] - 2026-06-27
 
