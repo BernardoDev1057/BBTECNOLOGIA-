@@ -14,15 +14,15 @@ export function imprimirComprovante(titulo, corpo) {
                     margin: 0; 
                 }
                 body { 
-                    font-family: 'Courier New', Courier, monospace; 
-                    font-size: 12px;
+                     font-family: 'Arial', Courier, monospace; 
+                    font-size: 15px;
                     line-height: 1.4;
                     padding: 10px; 
                     margin: 0;
                     width: 100%;
                 }
                 .linha { border-bottom: 1px dashed #000; margin: 8px 0; }
-                h3 { text-align: center; margin: 5px 0; font-size: 14px; text-transform: uppercase; }
+                h3 { text-align: center; margin: 5px 0; font-size: 15px; text-transform: uppercase; }
                 p { margin: 4px 0; }
                 
                 /* Garante uma quebra de linha limpa em tabelas ou textos longos */
@@ -36,7 +36,7 @@ export function imprimirComprovante(titulo, corpo) {
                 ${corpo}
             </div>
             <div class="linha"></div>
-            <p style="text-align:center; font-size: 10px;">Data: ${new Date().toLocaleString("pt-BR")}</p>
+            <p style="text-align:center; font-size: 13px;">Data: ${new Date().toLocaleString("pt-BR")}</p>
             
             <script>
                 // Executa a impressão de forma segura após o carregamento total do DOM

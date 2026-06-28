@@ -5,6 +5,25 @@ Todas as alterações importantes deste projeto serão documentadas neste arquiv
 
 O formato segue o padrão Keep a Changelog e utiliza Versionamento Semântico (SemVer).
 
+# [1.3.1] - 2026-06-28
+
+## Corrigido
+- Padronizada a leitura dos itens das vendas utilizando os campos `descricao` e `quantidade`.
+- Corrigida a exibição dos produtos:
+  - Resumo das vendas.
+  - Detalhes da venda.
+  - Emissão de cupons/comprovantes.
+
+## Melhorado
+- Atualizado o layout de impressão dos comprovantes.
+- Alterada a fonte de `Courier New` para `Arial`, proporcionando melhor legibilidade.
+- Aumentado o tamanho da fonte do corpo do comprovante.
+- Aumentado o tamanho do título da impressão.
+- Aumentado o tamanho da fonte da data impressa no rodapé.
+
+## Compatibilidade
+- Mantida compatibilidade com os registros atuais de vendas.
+- Ajustada a interface para refletir corretamente a nova estrutura dos itens armazenados.
 
 ## [1.3.0] - 2026-06-28
 

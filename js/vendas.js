@@ -19,7 +19,7 @@ async function renderizarTabelaVendas() {
         .sort((a, b) => new Date(b[1].dataHora) - new Date(a[1].dataHora))
         .forEach(([id, v]) => {
             const status = v.cancelado ? '<span class="badge bg-danger">Cancelada</span>' : (v.ativo === false ? '<span class="badge bg-secondary">Inativa</span>' : '<span class="badge bg-success">Ativa</span>');
-            const itensResumo = v.itens ? v.itens.map(i => `${i.nome} x${i.qtd}`).join(', ') : '—';
+            const itensResumo = v.itens ? v.itens.map(i => `${i.descricao} x${i.quantidade}`).join(', ') : '—';
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -52,7 +52,7 @@ async function abrirDetalhesVenda(id) {
     const v = s.val();
 
     let itensHtml = '';
-    if (v.itens) itensHtml = v.itens.map(i => `<div style="display:flex; justify-content:space-between"><div>${i.nome} x${i.qtd}</div><div>${fmtMoney(i.preco)}</div></div>`).join('');
+    if (v.itens) itensHtml = v.itens.map(i => `<div style="display:flex; justify-content:space-between"><div>${i.descricao} x${i.quantidade}</div><div>${fmtMoney(i.preco)}</div></div>`).join('');
 
     const corpo = `
         <p><strong>Venda:</strong> ${id}</p>
@@ -74,7 +74,7 @@ async function emitirCupom(id) {
     const v = s.val();
 
     let itensHtml = '';
-    if (v.itens) itensHtml = v.itens.map(i => `<div style="display:flex; justify-content:space-between"><span>${i.nome} x${i.qtd}</span><span>${fmtMoney(i.preco)}</span></div>`).join('');
+    if (v.itens) itensHtml = v.itens.map(i => `<div style="display:flex; justify-content:space-between"><span>${i.descricao} x${i.quantidade}</span><span>${fmtMoney(i.preco)}</span></div>`).join('');
 
     const corpo = `
         <div style="font-family:monospace; font-size:12px;">
